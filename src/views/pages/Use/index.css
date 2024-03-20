@@ -1,0 +1,43 @@
+.use-request {
+  width: 100%;
+  height: calc(20vh - 80px);
+}
+
+.use-request p,
+.use-response p {
+  padding: 0 10px;
+  font-family: Arial, Helvetica, sans-serif;
+  font-weight: bold;
+}
+
+.use-response {
+  width: 100%;
+  height: 20vh;
+}
+
+.use-button {
+  width: 60px;
+  height: 60px;
+  background: red;
+  border-radius: 50%;
+  margin-left: calc(50vw - 30px);
+  cursor: pointer;
+  outline: none;
+}
+:focus {
+  outline: none;
+}
+::-moz-focus-inner {
+  border: 0;
+}
+
+.use-button:focus {
+  outline: none;
+}
+
+.use-audio {
+  display: block;
+  width: 100%;
+  border-radius: 15px;
+  margin-bottom: 5px;
+}
