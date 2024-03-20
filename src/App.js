@@ -7,14 +7,11 @@ import "./App.css";
 const App = () => {
   const [recorder, setRecorder] = useState(null);
 
-  console.log("render");
-
   const timeElapsed =
     (localStorage.getItem("timeEnd") ?? 0) -
     (localStorage.getItem("timeStart") ?? 0);
 
   const onRecordingReady = (event) => {
-    console.log("timeElapsed", timeElapsed);
     if (timeElapsed >= 1000) {
       console.log("b");
       sendRecord(event.data);
@@ -51,6 +48,18 @@ const App = () => {
     recorder.stop();
   }
 
+  const loadAudioFile = async (filePath) => {
+    const response = await fetch(filePath);
+    const blob = await response.blob();
+
+    const audioElement = document.createElement("audio");
+    const recordsElement = document.getElementById("records");
+
+    audioElement.src = URL.createObjectURL(blob);
+    audioElement.controls = true;
+    recordsElement.appendChild(audioElement);
+  };
+
   const sendRecord = (blob) => {
     const formData = new FormData();
     formData.append("audio", blob);
@@ -66,9 +75,7 @@ const App = () => {
         }
         return response.json();
       })
-      .then((data) => {
-        console.log("Áudio enviado com sucesso:", data);
-      })
+      .then((data) => loadAudioFile(data.file_path))
       .catch((error) => {
         console.error("Erro ao enviar áudio para o backend:", error);
       });
