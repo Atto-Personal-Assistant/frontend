@@ -1,93 +1,43 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useEffect, useState } from "react";
-
-import { MediaRecorder, register } from "extendable-media-recorder";
-import { connect } from "extendable-media-recorder-wav-encoder";
+import { useState } from "react";
 
 import { Config } from "application/constants";
+import axios from "axios";
 
 export const useTrain = () => {
-  const [recorder, setRecorder] = useState(null);
-  const [train, setTrain] = useState({ input: null, output: null });
+  const [train, setTrain] = useState({ input: "", output: "", response: "" });
 
-  const timeElapsed =
-    (localStorage.getItem("timeEnd") ?? 0) -
-    (localStorage.getItem("timeStart") ?? 0);
+  const isValidToSendRequest =
+    ![null, "", 0].includes(train.input) &&
+    ![null, "", 0].includes(train.output);
 
-  const onRecordingReady = ({ data: recordBlob }) => {
-    setTrain((prev) => ({
-      input: prev?.input ?? recordBlob,
-      output: !!prev?.input ? recordBlob : prev.output,
-    }));
+  const onChangeInput = ({ target: { name, value } }) => {
+    console.log(name, value);
+
+    setTrain({ ...train, [name]: value });
   };
 
-  const fetchInitial = async ({ setRecorder }) => {
-    await register(await connect());
-    await navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => {
-        const response = new MediaRecorder(stream, {
-          mimeType: "audio/wav",
-        });
-        response.addEventListener("dataavailable", onRecordingReady);
-        setRecorder(response);
-      });
-  };
+  const sendRequest = () => {
+    if (!isValidToSendRequest) return;
 
-  const startRecording = ({ recorder }) => {
-    const dateNow = new Date().getTime();
-    localStorage.setItem("timeStart", dateNow);
-    navigator.vibrate(200);
-    recorder.start();
-  };
+    const payload = { ...train };
 
-  const stopRecording = ({ recorder }) => {
-    const dateNow = new Date().getTime();
-    localStorage.setItem("timeEnd", dateNow);
-    recorder.stop();
-  };
+    // setTrain({ input: null, output: null });
 
-  const sendRecord = () => {
-    const formData = new FormData();
-
-    formData.append("input_audio", train.input);
-    formData.append("output_audio", train.output);
-
-    setTrain({ input: null, output: null });
-
-    fetch(`${Config.STAGE.BASE_URL}/neural-network/train`, {
-      method: "POST",
-      body: formData,
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("Erro ao enviar áudio para o backend");
-        }
-        return response.json();
-      })
-      .then((response) => console.log("response", response))
+    axios
+      .post(`${Config.STAGE.BASE_URL}/neural-network/train`, payload)
+      .then(({ data: { response } }) =>
+        setTrain((prev) => ({ ...prev, response }))
+      )
       .catch((error) => {
-        console.error("Erro ao enviar áudio para o backend:", error);
+        console.error("Erro ao enviar textos para o backend:", error);
       });
   };
-
-  useEffect(() => {
-    fetchInitial({
-      setRecorder,
-    });
-  }, []);
-
-  useEffect(() => {
-    if (timeElapsed >= 1000 && !!train?.input && !!train?.output) {
-      sendRecord();
-    }
-  }, [train]);
 
   return {
-    fetchInitial,
-    startRecording,
-    stopRecording,
-    recorder,
-    setRecorder,
+    train,
+    sendRequest,
+    onChangeInput,
+    isValidToSendRequest,
   };
 };

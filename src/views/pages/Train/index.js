@@ -4,26 +4,44 @@ import "./index.css";
 import { useTrain } from "./useTrain";
 
 export const Train = () => {
-  const { startRecording, stopRecording, recorder } = useTrain();
+  const { train, sendRequest, onChangeInput, isValidToSendRequest } =
+    useTrain();
+
+  console.log("train.response", train.response);
+  
 
   return (
     <Layout>
       <div className="train-request">
-        <p>Gravar Pergunta/Resposta</p>
+        <h3>Gravar Pergunta/Resposta</h3>
 
-        <button
-          className="train-button"
-          onMouseDown={() => startRecording({ recorder })}
-          onMouseUp={() => stopRecording({ recorder })}
-          onTouchStart={() => startRecording({ recorder })}
-          onTouchEnd={() => stopRecording({ recorder })}
-        />
+        <div>
+          <input
+            name="input"
+            value={train.input}
+            onChange={onChangeInput}
+            placeholder="Pergunta"
+          />
+          <input
+            name="output"
+            value={train.output}
+            onChange={onChangeInput}
+            placeholder="Resposta"
+          />
+          <button
+            disabled={!isValidToSendRequest}
+            onClick={sendRequest}
+            className="train-button"
+          >
+            Enviar
+          </button>
+        </div>
       </div>
 
       <div className="train-response">
-        <p>Resposta da Rede Neural</p>
+        <h3>Resposta da Rede Neural</h3>
 
-        <audio className="train-audio" controls />
+        <p>{train.response}</p>
       </div>
     </Layout>
   );
