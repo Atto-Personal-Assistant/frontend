@@ -1,23 +1,23 @@
-const TYPE_STAGES = {
-    LOCAL: "LOCAL",
-    DEV: "DEV",
-  };
-  
-  const STAGE = {
-    LOCAL: {
-      BASE_URL: "http://127.0.0.1:8000",
+const STAGE = {
+  local: {
+    BASE_URL: "http://127.0.0.1:8000",
+  },
+  development: {
+    BASE_URL: "https://api-b87s.onrender.com",
+  },
+  production: {
+    BASE_URL: "https://api-b87s.onrender.com",
+  },
+};
+
+const Config = {
+  ROUTES: {
+    NEURAL_NEWTWORK: {
+      USE: "neural-network/use",
+      TRAIN: "neural-network/train",
     },
-    DEV: {
-      BASE_URL: "https://balance-api.onrender.com",
-    },
-  };
-  
-  const Config = {
-    ROUTES: {
-      AUTH: "auth",
-      USERS: "users",
-    },
-    STAGE: STAGE[TYPE_STAGES.LOCAL],
-  };
-  
-  export { Config };
+  },
+  STAGE: STAGE[process.env.REACT_APP_ENV] ?? STAGE[process.env.NODE_ENV],
+};
+
+export { Config };
