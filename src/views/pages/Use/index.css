@@ -1,43 +1,73 @@
-.use-request {
+.chat {
   width: 100%;
-  height: calc(20vh - 80px);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 100px;
 }
 
-.use-request p,
-.use-response p {
-  padding: 0 10px;
-  font-family: Arial, Helvetica, sans-serif;
-  font-weight: bold;
+.chat-title {
+  padding-left: 10px;
+  margin: 10px 0 0 0;
 }
 
-.use-response {
+.chat-message-left {
+  background-color: #0084ff80;
+  width: 50%;
+  min-height: 50px;
+  margin-left: 10px;
+  margin-top: 10px;
+  position: relative;
+  left: 0;
+  border-radius: 5px;
+  color: #fff;
+  padding: 5px;
+  box-sizing: border-box;
+}
+
+.chat-message-right {
+  background-color: #01b46980;
+  width: 50%;
+  min-height: 50px;
+  margin-top: 10px;
+  margin-left: 10px;
+  position: relative;
+  left: calc(50% - 20px);
+  border-radius: 5px;
+  color: #fff;
+  padding: 5px;
+  box-sizing: border-box;
+}
+
+.chat-request {
+  display: flex;
   width: 100%;
-  height: 20vh;
+  box-sizing: border-box;
+  padding: 0 5%;
+  gap: 20px;
+  justify-content: space-around;
+
+  position: fixed;
+  bottom: calc(
+    30px / 2 + 10px
+  ); /* 30px of height, and more 10 px to separeted the background */
 }
 
-.use-button {
-  width: 60px;
-  height: 60px;
-  background: red;
-  border-radius: 50%;
-  margin-left: calc(50vw - 30px);
-  cursor: pointer;
-  outline: none;
-}
-:focus {
-  outline: none;
-}
-::-moz-focus-inner {
+.chat-request-input {
+  width: 90%;
+  height: 30px;
   border: 0;
+  border-radius: 10px;
+  background-color: #00000090;
+  color: #fff;
+  padding-left: 20px;
 }
 
-.use-button:focus {
-  outline: none;
-}
-
-.use-audio {
-  display: block;
-  width: 100%;
-  border-radius: 15px;
-  margin-bottom: 5px;
+.chat-request-send {
+  background-color: #00000090;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: bolder;
+  border: 0;
 }

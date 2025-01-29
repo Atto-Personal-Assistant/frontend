@@ -1,8 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useState } from "react";
 
-import { Config } from "application/constants";
-import axios from "axios";
+import { trainNeuralNetwork } from "infrastructure/services";
 
 export const useTrain = () => {
   const [train, setTrain] = useState({ input: "", output: "", response: "" });
@@ -20,18 +19,15 @@ export const useTrain = () => {
   const sendRequest = () => {
     if (!isValidToSendRequest) return;
 
-    const payload = { ...train };
-
     // setTrain({ input: null, output: null });
 
-    axios
-      .post(`${Config.STAGE.BASE_URL}/neural-network/train`, payload)
-      .then(({ data: { response } }) =>
-        setTrain((prev) => ({ ...prev, response }))
-      )
-      .catch((error) => {
-        console.error("Erro ao enviar textos para o backend:", error);
-      });
+    const payload = { input: train.input, output: train.output };
+
+    const callback = ({ data: { response } }) => {
+      setTrain((prev) => ({ ...prev, response }));
+    };
+
+    trainNeuralNetwork({ payload, callback });
   };
 
   return {

@@ -1,36 +1,37 @@
-import { useEffect, useState } from "react";
-
 import { Layout } from "views/components";
 
+import { useUse } from "./useUse";
 import "./index.css";
-import { fetchInitial, startRecording, stopRecording } from "./services";
 
 export const Use = () => {
-  const [recorder, setRecorder] = useState(null);
-
-  useEffect(() => {
-    fetchInitial({
-      setRecorder,
-    });
-  }, []);
+  const { input, messages, handleInput, sendRequest } = useUse();
 
   return (
     <Layout>
-      <div className="use-response">
-        <p>Gravar Pergunta</p>
+      <div className="chat">
+        <h3 className="chat-title">Chat</h3>
 
-        <button
-          className="use-button"
-          onMouseDown={() => startRecording({ recorder })}
-          onMouseUp={() => stopRecording({ recorder })}
-          onTouchStart={() => startRecording({ recorder })}
-          onTouchEnd={() => stopRecording({ recorder })}
-        />
-      </div>
-      <div className="use-request">
-        <p>Resposta da Rede Neural</p>
+        {messages.map(({ actor, message }, currentIndex) => {
+          const sideMessage = actor === "Atto" ? "left" : "right";
 
-        <audio className="use-audio" controls />
+          return (
+            <div id={currentIndex} className={`chat-message-${sideMessage}`}>
+              {message}
+            </div>
+          );
+        })}
+
+        <div className="chat-request">
+          <input
+            value={input}
+            onChange={handleInput}
+            className="chat-request-input"
+            placeholder="Faça sua pergunta..."
+          />
+          <button className="chat-request-send" onClick={sendRequest}>
+            {">"}
+          </button>
+        </div>
       </div>
     </Layout>
   );
