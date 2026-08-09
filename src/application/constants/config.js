@@ -1,12 +1,16 @@
+const apiUrl = process.env.REACT_APP_API_URL;
+
 const STAGE = {
   local: {
-    BASE_URL: "http://127.0.0.1:8000",
+    BASE_URL: apiUrl || "http://127.0.0.1:8000",
   },
   development: {
-    BASE_URL: "https://api-b87s.onrender.com",
+    // The agent runs alongside the local API/Ollama process. A hosted API can
+    // still be selected explicitly with REACT_APP_API_URL.
+    BASE_URL: apiUrl || "http://127.0.0.1:8000",
   },
   production: {
-    BASE_URL: "https://api-b87s.onrender.com",
+    BASE_URL: apiUrl || "https://api-b87s.onrender.com",
   },
 };
 
