@@ -351,6 +351,7 @@ export const useUse = () => {
     if (sendAgentAnswer(socket.current, pendingQuestion.question_id, message)) {
       setPendingQuestion(null);
       setInput("");
+      setIsRunning(true);
       setStatus(language().toLowerCase().startsWith("pt") ? "Enviando sua decisão ao agent..." : "Sending your decision to the agent...");
     }
   };
