@@ -1,12 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 
-import { connectToAgent, sendAgentAnswer } from "infrastructure/services";
+import { connectToAgent, deleteAgentSession, listAgentSessionActions, sendAgentAnswer } from "infrastructure/services";
 
-const portuguesePattern = /[ãõáéíóúâêôç]|\b(como|não|nao|para|por|projeto|revise|resumo|ajuda|quero|preciso|pode|você|voce)\b/i;
+const language = () => "pt-BR";
+const chatStorageKey = "atto.agent.chats.v1";
 
-const language = (message = "") => {
-  if (portuguesePattern.test(message)) return "pt-BR";
-  return navigator.language || "pt-BR";
+const createChat = () => ({
+  id: window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+  sessionId: window.crypto?.randomUUID?.() || `session-${Date.now()}-${Math.random()}`,
+  title: "Nova conversa",
+  createdAt: new Date().toISOString(),
+  messages: [{ actor: "Atto", message: "Como eu posso te ajudar?" }],
+  activities: [],
+});
+
+const loadChats = () => {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(chatStorageKey));
+    if (Array.isArray(saved) && saved.length) return saved;
+  } catch {
+    // A malformed local cache must not prevent the chat from opening.
+  }
+  return [createChat()];
 };
 
 const statusMessage = (event, locale) => {
@@ -26,13 +41,45 @@ const statusMessage = (event, locale) => {
   return messages[event.stage] || event.message;
 };
 
-const speak = (message, locale) => {
-  if (!("speechSynthesis" in window) || !message) return;
+const speak = (message, locale, handlers = {}) => {
+  const { onStart, onEnd, onError, retainUtterance } = handlers;
+  if (!("speechSynthesis" in window)) {
+    onError?.("Este navegador não oferece síntese de voz.");
+    return;
+  }
+  if (!message) return;
 
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(message);
-  utterance.lang = locale;
-  window.speechSynthesis.speak(utterance);
+  let started = false;
+  const start = () => {
+    if (started) return;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) {
+      onError?.("Nenhuma voz do sistema foi encontrada. Instale ou ative uma voz nas configurações do sistema.");
+      return;
+    }
+    started = true;
+    const voice = voices.find(({ lang }) => lang.toLowerCase() === locale.toLowerCase())
+      || voices.find(({ lang }) => lang.toLowerCase().startsWith("pt"));
+    const utterance = new SpeechSynthesisUtterance(message);
+    utterance.lang = locale;
+    utterance.rate = 1;
+    if (voice) utterance.voice = voice;
+    retainUtterance?.(utterance);
+    utterance.onstart = () => onStart?.();
+    utterance.onend = () => onEnd?.();
+    utterance.onerror = (event) => onError?.(`A reprodução foi interrompida (${event.error || "erro desconhecido"}).`);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.resume();
+    window.speechSynthesis.speak(utterance);
+  };
+
+  if (window.speechSynthesis.getVoices().length) {
+    start();
+    return;
+  }
+
+  window.speechSynthesis.onvoiceschanged = start;
+  window.setTimeout(start, 800);
 };
 
 const activityFor = (event) => {
@@ -56,38 +103,71 @@ const activityFor = (event) => {
     answer_received: ["✓", "Decisão recebida", "Continuando a execução"],
   };
   const [icon, title, detail] = stages[event.stage] || ["◌", "Atualização do agente", event.message];
-  return { icon, title, detail, state: event.stage === "planned" ? "done" : "active" };
+  const roadmapDetail = event.stage === "planned" && event.skill
+    ? `Skill selecionada: ${event.skill}`
+    : detail;
+  return { icon, title, detail: roadmapDetail, state: event.stage === "planned" ? "done" : "active" };
 };
 
 export const useUse = () => {
   const socket = useRef(null);
+  const initialChats = useRef(null);
+  if (!initialChats.current) initialChats.current = loadChats();
+  const activeUtterance = useRef(null);
+  const speechRequestId = useRef(0);
+  const [chats, setChats] = useState(initialChats.current);
+  const [activeChatId, setActiveChatId] = useState(initialChats.current[0].id);
   const [input, setInput] = useState("");
   const [status, setStatus] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [pendingQuestion, setPendingQuestion] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [activities, setActivities] = useState([]);
+  const [copiedMessageId, setCopiedMessageId] = useState(null);
+  const [availableActions, setAvailableActions] = useState([]);
   const recognition = useRef(null);
-  const [messages, setMessages] = useState([
-    { actor: "Atto", message: "Como eu posso te ajudar?" },
-  ]);
+
+  const activeChat = chats.find(({ id }) => id === activeChatId) || chats[0];
+  const messages = activeChat?.messages || [];
+  const activities = activeChat?.activities || [];
 
   useEffect(() => () => {
     socket.current?.close();
     recognition.current?.abort?.();
   }, []);
 
-  const addActivity = (event) => {
-    setActivities((previous) => [
-      ...previous,
-      { id: `${Date.now()}-${Math.random()}`, at: new Date(), ...activityFor(event) },
-    ]);
+  useEffect(() => {
+    window.localStorage.setItem(chatStorageKey, JSON.stringify(chats));
+  }, [chats]);
+
+  useEffect(() => {
+    let active = true;
+    if (!activeChat?.sessionId) return undefined;
+    listAgentSessionActions(activeChat.sessionId)
+      .then((actions) => { if (active) setAvailableActions(actions); })
+      .catch(() => { if (active) setAvailableActions([]); });
+    return () => { active = false; };
+  }, [activeChat?.sessionId]);
+
+  const updateActiveChat = (updater) => {
+    setChats((previous) => previous.map((chat) => (
+      chat.id === activeChatId ? updater(chat) : chat
+    )));
   };
 
-  const addAssistantMessage = (message, shouldSpeak = true) => {
-    setMessages((previous) => [...previous, { actor: "Atto", message }]);
-    if (shouldSpeak && voiceEnabled) speak(message, language(message));
+  const addActivity = (event) => {
+    updateActiveChat((chat) => ({
+      ...chat,
+      activities: [...chat.activities, { id: `${Date.now()}-${Math.random()}`, at: new Date(), ...activityFor(event) }],
+    }));
+  };
+
+  const addAssistantMessage = (message, shouldSpeak = true, action = null) => {
+    updateActiveChat((chat) => ({
+      ...chat,
+      messages: [...chat.messages, { actor: "Atto", message, action }],
+    }));
+    if (shouldSpeak && voiceEnabled) playSpeech(message);
   };
 
   const handleAgentEvent = (event) => {
@@ -107,7 +187,12 @@ export const useUse = () => {
 
     if (event.type === "result") {
       setStatus("");
-      addAssistantMessage(event.message);
+      addAssistantMessage(event.message, true, event.action);
+      if (event.action) {
+        setAvailableActions((current) => current.some(({ name }) => name === event.action.name)
+          ? current
+          : [...current, event.action]);
+      }
       addActivity(event);
       return;
     }
@@ -128,18 +213,84 @@ export const useUse = () => {
 
   const handleInput = ({ target: { value } }) => setInput(value);
 
+  const copyMessage = async (messageId, message) => {
+    try {
+      await navigator.clipboard.writeText(message);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = message;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    setCopiedMessageId(messageId);
+    window.setTimeout(() => setCopiedMessageId(null), 1800);
+  };
+
+  const playSpeech = (message, showStatus = false) => {
+    const requestId = speechRequestId.current + 1;
+    speechRequestId.current = requestId;
+    speak(message, language(), {
+      retainUtterance: (utterance) => { activeUtterance.current = utterance; },
+      onStart: () => {
+        if (showStatus && requestId === speechRequestId.current) setStatus("Lendo a resposta em voz alta...");
+      },
+      onEnd: () => {
+        if (requestId !== speechRequestId.current) return;
+        activeUtterance.current = null;
+        if (showStatus) setStatus("");
+      },
+      onError: (messageError) => {
+        if (requestId !== speechRequestId.current || messageError.includes("canceled")) return;
+        setStatus(messageError);
+      },
+    });
+  };
+
+  const speakMessage = (message) => {
+    setVoiceEnabled(true);
+    playSpeech(message, true);
+  };
+
   const sendRequest = () => {
     const message = input.trim();
     if (!message || isRunning) return;
 
-    setMessages((previous) => [...previous, { actor: "user", message }]);
-    setActivities([{ id: `${Date.now()}-request`, at: new Date(), icon: "●", title: "Nova solicitação", detail: message, state: "active" }]);
+    updateActiveChat((chat) => ({
+      ...chat,
+      title: chat.title === "Nova conversa" ? message.slice(0, 36) : chat.title,
+      messages: [...chat.messages, { actor: "user", message }],
+      activities: [...chat.activities, { id: `${Date.now()}-request`, at: new Date(), icon: "●", title: "Nova solicitação", detail: message, state: "active" }],
+    }));
     setInput("");
     setStatus(language().toLowerCase().startsWith("pt") ? "Conectando ao agent..." : "Connecting to the agent...");
     setIsRunning(true);
     socket.current = connectToAgent({
       input: message,
-      language: language(message),
+      language: language(),
+      sessionId: activeChat.sessionId,
+      onEvent: handleAgentEvent,
+      onError: () => addAssistantMessage("Não foi possível conectar ao agent."),
+      onClose: () => setIsRunning(false),
+    });
+  };
+
+  const rerunAction = (action) => {
+    if (isRunning || !action?.name) return;
+    const message = `Reexecutar: ${action.name}`;
+    updateActiveChat((chat) => ({
+      ...chat,
+      messages: [...chat.messages, { actor: "user", message }],
+      activities: [...chat.activities, { id: `${Date.now()}-rerun`, at: new Date(), icon: "↻", title: "Reexecutando ação", detail: action.name, state: "active" }],
+    }));
+    setStatus("Conectando ao agent...");
+    setIsRunning(true);
+    socket.current = connectToAgent({
+      input: message,
+      language: language(),
+      sessionId: activeChat.sessionId,
+      command: { operation: "repeat", action_name: action.name },
       onEvent: handleAgentEvent,
       onError: () => addAssistantMessage("Não foi possível conectar ao agent."),
       onClose: () => setIsRunning(false),
@@ -180,12 +331,36 @@ export const useUse = () => {
     const message = answer.trim();
     if (!message || !pendingQuestion) return;
 
-    setMessages((previous) => [...previous, { actor: "user", message }]);
+    updateActiveChat((chat) => ({
+      ...chat,
+      messages: [...chat.messages, { actor: "user", message }],
+    }));
     if (sendAgentAnswer(socket.current, pendingQuestion.question_id, message)) {
       setPendingQuestion(null);
       setInput("");
       setStatus(language().toLowerCase().startsWith("pt") ? "Enviando sua decisão ao agent..." : "Sending your decision to the agent...");
     }
+  };
+
+  const deleteChat = async (chatId) => {
+    if (isRunning) return;
+    const chat = chats.find(({ id }) => id === chatId);
+    if (!chat || !window.confirm(`Excluir a conversa “${chat.title}”? Esta ação não pode ser desfeita.`)) return;
+
+    try {
+      await deleteAgentSession(chat.sessionId);
+    } catch (error) {
+      setStatus(error.message || "Não foi possível excluir a conversa.");
+      return;
+    }
+
+    const remaining = chats.filter(({ id }) => id !== chatId);
+    const nextChats = remaining.length ? remaining : [createChat()];
+    setChats(nextChats);
+    if (chatId === activeChatId) setActiveChatId(nextChats[0].id);
+    setInput("");
+    setStatus("");
+    setPendingQuestion(null);
   };
 
   return {
@@ -202,5 +377,29 @@ export const useUse = () => {
     activities,
     voiceEnabled,
     setVoiceEnabled,
+    copiedMessageId,
+    copyMessage,
+    speakMessage,
+    rerunAction,
+    availableActions,
+    chats,
+    activeChatId,
+    createNewChat: () => {
+      if (isRunning) return;
+      const chat = createChat();
+      setChats((previous) => [chat, ...previous]);
+      setActiveChatId(chat.id);
+      setInput("");
+      setStatus("");
+      setPendingQuestion(null);
+    },
+    selectChat: (chatId) => {
+      if (isRunning) return;
+      setActiveChatId(chatId);
+      setInput("");
+      setStatus("");
+      setPendingQuestion(null);
+    },
+    deleteChat,
   };
 };

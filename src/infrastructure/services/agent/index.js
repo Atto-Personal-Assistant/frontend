@@ -5,10 +5,27 @@ const websocketUrl = () => {
   return `${baseUrl}/agent/ws`;
 };
 
-export const connectToAgent = ({ input, language, onEvent, onError, onClose }) => {
+const agentUrl = () => `${Config.STAGE.BASE_URL}/agent`;
+
+export const deleteAgentSession = async (sessionId) => {
+  const response = await fetch(`${agentUrl()}/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error("Não foi possível excluir a sessão no servidor.");
+  return response.json();
+};
+
+export const listAgentSessionActions = async (sessionId) => {
+  const response = await fetch(`${agentUrl()}/sessions/${encodeURIComponent(sessionId)}/actions`);
+  if (!response.ok) throw new Error("Não foi possível carregar as ações da sessão.");
+  const payload = await response.json();
+  return Array.isArray(payload.actions) ? payload.actions : [];
+};
+
+export const connectToAgent = ({ input, language, sessionId, command, onEvent, onError, onClose }) => {
   const socket = new WebSocket(websocketUrl());
 
-  socket.onopen = () => socket.send(JSON.stringify({ type: "start", input, language }));
+  socket.onopen = () => socket.send(JSON.stringify({ type: "start", input, language, session_id: sessionId, command }));
   socket.onmessage = ({ data }) => onEvent(JSON.parse(data));
   socket.onerror = onError;
   socket.onclose = onClose;
