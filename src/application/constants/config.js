@@ -10,7 +10,9 @@ const STAGE = {
     BASE_URL: apiUrl || "http://127.0.0.1:8000",
   },
   production: {
-    BASE_URL: apiUrl || "https://api-b87s.onrender.com",
+    BASE_URL:
+      apiUrl ||
+      "https://ur5lvlgls6f2zsoqgi6o3enofi0bfbrv.lambda-url.sa-east-1.on.aws",
   },
 };
 
