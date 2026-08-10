@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { connectToAgent, deleteAgentSession, listAgentSessionActions, sendAgentAnswer } from "infrastructure/services";
+import { connectToAgent, deleteAgentSession, getAgentSession, listAgentSessionActions, sendAgentAnswer } from "infrastructure/services";
 
 const language = () => "pt-BR";
 const chatStorageKey = "atto.agent.chats.v1";
@@ -143,11 +143,24 @@ export const useUse = () => {
   useEffect(() => {
     let active = true;
     if (!activeChat?.sessionId) return undefined;
+    getAgentSession(activeChat.sessionId)
+      .then(({ messages: canonicalMessages }) => {
+        if (!active || !Array.isArray(canonicalMessages) || !canonicalMessages.length) return;
+        setChats((current) => current.map((chat) => chat.id === activeChat.id ? {
+          ...chat,
+          messages: canonicalMessages.map(({ role, content, action }) => ({
+            actor: role === "assistant" ? "Atto" : "user",
+            message: content,
+            action: action || null,
+          })),
+        } : chat));
+      })
+      .catch(() => {});
     listAgentSessionActions(activeChat.sessionId)
       .then((actions) => { if (active) setAvailableActions(actions); })
       .catch(() => { if (active) setAvailableActions([]); });
     return () => { active = false; };
-  }, [activeChat?.sessionId]);
+  }, [activeChat?.id, activeChat?.sessionId]);
 
   const updateActiveChat = (updater) => {
     setChats((previous) => previous.map((chat) => (

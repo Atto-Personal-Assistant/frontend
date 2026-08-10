@@ -22,6 +22,12 @@ export const listAgentSessionActions = async (sessionId) => {
   return Array.isArray(payload.actions) ? payload.actions : [];
 };
 
+export const getAgentSession = async (sessionId) => {
+  const response = await fetch(`${agentUrl()}/sessions/${encodeURIComponent(sessionId)}`);
+  if (!response.ok) throw new Error("Não foi possível carregar a conversa.");
+  return response.json();
+};
+
 export const connectToAgent = ({ input, language, sessionId, command, onEvent, onError, onClose }) => {
   const socket = new WebSocket(websocketUrl());
 
