@@ -45,13 +45,15 @@ const speak = (message, locale, handlers = {}) => {
   const { onStart, onEnd, onError, retainUtterance } = handlers;
   if (!("speechSynthesis" in window)) {
     onError?.("Este navegador não oferece síntese de voz.");
-    return;
+    return () => {};
   }
-  if (!message) return;
+  if (!message) return () => {};
 
   let started = false;
+  let canceled = false;
+  let voiceTimeout;
   const start = () => {
-    if (started) return;
+    if (started || canceled) return;
     const voices = window.speechSynthesis.getVoices();
     if (!voices.length) {
       onError?.("Nenhuma voz do sistema foi encontrada. Instale ou ative uma voz nas configurações do sistema.");
@@ -75,11 +77,17 @@ const speak = (message, locale, handlers = {}) => {
 
   if (window.speechSynthesis.getVoices().length) {
     start();
-    return;
+  } else {
+    window.speechSynthesis.onvoiceschanged = start;
+    voiceTimeout = window.setTimeout(start, 800);
   }
 
-  window.speechSynthesis.onvoiceschanged = start;
-  window.setTimeout(start, 800);
+  return () => {
+    canceled = true;
+    if (voiceTimeout) window.clearTimeout(voiceTimeout);
+    if (window.speechSynthesis.onvoiceschanged === start) window.speechSynthesis.onvoiceschanged = null;
+    window.speechSynthesis.cancel();
+  };
 };
 
 const activityFor = (event) => {
@@ -114,6 +122,7 @@ export const useUse = () => {
   const initialChats = useRef(null);
   if (!initialChats.current) initialChats.current = loadChats();
   const activeUtterance = useRef(null);
+  const cancelActiveSpeech = useRef(null);
   const speechRequestId = useRef(0);
   const [chats, setChats] = useState(initialChats.current);
   const [activeChatId, setActiveChatId] = useState(initialChats.current[0].id);
@@ -123,6 +132,7 @@ export const useUse = () => {
   const [pendingQuestion, setPendingQuestion] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState(null);
   const [availableActions, setAvailableActions] = useState([]);
   const recognition = useRef(null);
@@ -134,6 +144,7 @@ export const useUse = () => {
   useEffect(() => () => {
     socket.current?.close();
     recognition.current?.abort?.();
+    cancelActiveSpeech.current?.();
   }, []);
 
   useEffect(() => {
@@ -243,23 +254,38 @@ export const useUse = () => {
   };
 
   const playSpeech = (message, showStatus = false) => {
+    cancelActiveSpeech.current?.();
     const requestId = speechRequestId.current + 1;
     speechRequestId.current = requestId;
-    speak(message, language(), {
+    cancelActiveSpeech.current = speak(message, language(), {
       retainUtterance: (utterance) => { activeUtterance.current = utterance; },
       onStart: () => {
+        if (requestId !== speechRequestId.current) return;
+        setIsSpeaking(true);
         if (showStatus && requestId === speechRequestId.current) setStatus("Lendo a resposta em voz alta...");
       },
       onEnd: () => {
         if (requestId !== speechRequestId.current) return;
         activeUtterance.current = null;
+        cancelActiveSpeech.current = null;
+        setIsSpeaking(false);
         if (showStatus) setStatus("");
       },
       onError: (messageError) => {
         if (requestId !== speechRequestId.current || messageError.includes("canceled")) return;
+        setIsSpeaking(false);
         setStatus(messageError);
       },
     });
+  };
+
+  const stopSpeech = () => {
+    speechRequestId.current += 1;
+    cancelActiveSpeech.current?.();
+    cancelActiveSpeech.current = null;
+    activeUtterance.current = null;
+    setIsSpeaking(false);
+    setStatus((current) => current === "Lendo a resposta em voz alta..." ? "" : current);
   };
 
   const speakMessage = (message) => {
@@ -403,7 +429,12 @@ export const useUse = () => {
     startListening,
     activities,
     voiceEnabled,
-    setVoiceEnabled,
+    setVoiceEnabled: (enabled) => {
+      setVoiceEnabled(enabled);
+      if (!enabled) stopSpeech();
+    },
+    isSpeaking,
+    stopSpeech,
     copiedMessageId,
     copyMessage,
     speakMessage,

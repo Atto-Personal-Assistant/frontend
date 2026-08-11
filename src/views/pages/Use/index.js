@@ -6,9 +6,14 @@ import "./index.css";
 
 const InlineMarkdown = ({ text }) => (
   <>
-    {text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, index) => {
+    {text.split(/(\*\*[^*]+\*\*|`[^`]+`|https?:\/\/[^\s<]+)/g).map((part, index) => {
       if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>{part.slice(2, -2)}</strong>;
       if (part.startsWith("`") && part.endsWith("`")) return <code key={index}>{part.slice(1, -1)}</code>;
+      if (/^https?:\/\//.test(part)) {
+        const trailing = part.match(/[),.;!?]+$/)?.[0] || "";
+        const url = trailing ? part.slice(0, -trailing.length) : part;
+        return <React.Fragment key={index}><a href={url} target="_blank" rel="noopener noreferrer">{url}</a>{trailing}</React.Fragment>;
+      }
       return <React.Fragment key={index}>{part}</React.Fragment>;
     })}
   </>
@@ -47,10 +52,23 @@ export const Use = () => {
   const {
     input, messages, status, isRunning, pendingQuestion,
     isListening, handleInput, sendRequest, answerQuestion, startListening,
-    activities, voiceEnabled, setVoiceEnabled,
+    voiceEnabled, setVoiceEnabled, isSpeaking, stopSpeech,
     copiedMessageId, copyMessage, speakMessage, rerunAction, availableActions,
     chats, activeChatId, createNewChat, selectChat, deleteChat,
   } = useUse();
+  const [historyVisible, setHistoryVisible] = React.useState(
+    () => typeof window !== "undefined" && !window.matchMedia("(max-width: 700px)").matches,
+  );
+
+  const chooseChat = (chatId) => {
+    selectChat(chatId);
+    if (window.matchMedia("(max-width: 700px)").matches) setHistoryVisible(false);
+  };
+
+  const removeChat = async (chatId) => {
+    await deleteChat(chatId);
+    if (window.matchMedia("(max-width: 700px)").matches) setHistoryVisible(false);
+  };
 
   const submit = (event) => {
     event.preventDefault();
@@ -66,20 +84,21 @@ export const Use = () => {
           <div className={`agent-presence${isRunning ? " is-running" : ""}`}><span />{isRunning ? "Trabalhando" : "Pronto para ajudar"}</div>
         </header>
 
-        <section className="agent-grid">
-          <aside className="chat-list-panel" aria-label="Histórico de conversas">
-            <div className="chat-list-heading"><div><span className="eyebrow">HISTÓRICO</span><h2>Conversas</h2></div><button type="button" onClick={createNewChat} disabled={isRunning} title="Nova conversa" aria-label="Nova conversa">＋</button></div>
+        <section className={`agent-grid${historyVisible ? "" : " history-hidden"}`}>
+          {historyVisible && <button type="button" className="history-backdrop" onClick={() => setHistoryVisible(false)} aria-label="Fechar histórico" />}
+          <aside id="conversation-history" className={`chat-list-panel${historyVisible ? " is-open" : ""}`} aria-label="Histórico de conversas" aria-hidden={!historyVisible}>
+            <div className="chat-list-heading"><div><span className="eyebrow">HISTÓRICO</span><h2>Conversas</h2></div><div className="chat-list-heading-actions"><button type="button" onClick={createNewChat} disabled={isRunning} title="Nova conversa" aria-label="Nova conversa">＋</button><button type="button" className="history-close" onClick={() => setHistoryVisible(false)} title="Ocultar histórico" aria-label="Ocultar histórico">‹</button></div></div>
             <div className="chat-list">
               {chats.map((chat) => <div key={chat.id} className={`chat-list-item${chat.id === activeChatId ? " selected" : ""}`}>
-                <button type="button" className="chat-list-select" onClick={() => selectChat(chat.id)} disabled={isRunning}>
+                <button type="button" className="chat-list-select" onClick={() => chooseChat(chat.id)} disabled={isRunning}>
                   <strong>{chat.title}</strong><span>{new Date(chat.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</span>
                 </button>
-                <button type="button" className="chat-list-delete" onClick={() => deleteChat(chat.id)} disabled={isRunning} title={`Excluir ${chat.title}`} aria-label={`Excluir conversa ${chat.title}`}>×</button>
+                <button type="button" className="chat-list-delete" onClick={() => removeChat(chat.id)} disabled={isRunning} title={`Excluir ${chat.title}`} aria-label={`Excluir conversa ${chat.title}`}>×</button>
               </div>)}
             </div>
           </aside>
           <section className="conversation-panel" aria-label="Conversa com o Atto">
-            <div className="panel-heading"><div><span className="eyebrow">CONVERSA</span><h2>Seu pedido, do início ao resultado</h2></div><div className="conversation-actions">{availableActions.map((action) => <button key={action.name} type="button" className="rerun-action" onClick={() => rerunAction(action)} disabled={isRunning} title={`Executar ${action.name} novamente`}>↻ {action.name}</button>)}<button className={`voice-toggle${voiceEnabled ? " enabled" : ""}`} type="button" onClick={() => setVoiceEnabled(!voiceEnabled)} aria-pressed={voiceEnabled}>⌁ Voz {voiceEnabled ? "ligada" : "desligada"}</button></div></div>
+            <div className="panel-heading"><div className="conversation-heading"><button type="button" className="history-toggle" onClick={() => setHistoryVisible(!historyVisible)} aria-expanded={historyVisible} aria-controls="conversation-history" title={historyVisible ? "Ocultar histórico" : "Mostrar histórico"}>☰</button><div><span className="eyebrow">CONVERSA</span><h2>Seu pedido, do início ao resultado</h2></div></div><div className="conversation-actions">{availableActions.map((action) => <button key={action.name} type="button" className="rerun-action" onClick={() => rerunAction(action)} disabled={isRunning} title={`Executar ${action.name} novamente`}>↻ {action.name}</button>)}<button className={`voice-toggle${voiceEnabled ? " enabled" : ""}`} type="button" onClick={() => setVoiceEnabled(!voiceEnabled)} aria-pressed={voiceEnabled}>⌁ Voz {voiceEnabled ? "ligada" : "desligada"}</button></div></div>
             <div className="chat-history" aria-live="polite">
               {messages.map(({ actor, message, action, actions = [] }, currentIndex) => {
                 const messageId = `${actor}-${currentIndex}`;
@@ -88,7 +107,7 @@ export const Use = () => {
                   <span className="message-author">{actor === "Atto" ? "ATTO" : "VOCÊ"}</span>
                   <MarkdownMessage message={message} />
                   {actor === "Atto" && <div className="message-actions">
-                    <button type="button" onClick={() => speakMessage(message)} title="Ler em voz alta" aria-label="Ler em voz alta">🔊</button>
+                    <button type="button" className={isSpeaking ? "stop-speech" : ""} onClick={() => isSpeaking ? stopSpeech() : speakMessage(message)} title={isSpeaking ? "Parar áudio" : "Ler em voz alta"} aria-label={isSpeaking ? "Parar áudio" : "Ler em voz alta"}>{isSpeaking ? "⏹" : "🔊"}</button>
                     <button type="button" onClick={() => copyMessage(messageId, message)} title="Copiar resposta">{copiedMessageId === messageId ? "Copiado" : "Copiar"}</button>
                     {(actions.length ? actions : (action ? [action] : [])).map((messageAction) => (
                       <button key={`${messageAction.operation}-${messageAction.name}`} type="button" onClick={() => rerunAction(messageAction)} disabled={isRunning} title={messageAction.name} aria-label={messageAction.name}>
@@ -109,13 +128,6 @@ export const Use = () => {
             </form>
             <p className="input-hint">Use o microfone para ditar sua mensagem. O Atto responde por texto e voz.</p>
           </section>
-
-          <aside className="roadmap-panel" aria-label="Roadmap da execução">
-            <div className="panel-heading"><div><span className="eyebrow">ROADMAP AO VIVO</span><h2>O que o Atto está fazendo</h2></div><span className="activity-count">{activities.length} etapas</span></div>
-            <div className="roadmap">
-              {activities.length === 0 ? <div className="roadmap-empty"><span>◎</span><p>Envie um pedido para acompanhar cada etapa da execução.</p></div> : activities.map((activity, index) => <div className={`roadmap-item ${activity.state}`} key={activity.id}><div className="roadmap-marker">{activity.icon}</div><div><div className="roadmap-title-row"><strong>{activity.title}</strong><time>{new Date(activity.at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</time></div><p>{activity.detail}</p></div>{index < activities.length - 1 && <i />}</div>)}
-            </div>
-          </aside>
         </section>
       </main>
     </Layout>
