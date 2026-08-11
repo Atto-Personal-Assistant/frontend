@@ -9,7 +9,8 @@ const STAGE = {
   },
   production: {
     BASE_URL:
-      "https://ur5lvlgls6f2zsoqgi6o3enofi0bfbrv.lambda-url.sa-east-1.on.aws",
+      // "https://ur5lvlgls6f2zsoqgi6o3enofi0bfbrv.lambda-url.sa-east-1.on.aws",
+      "https://api-b87s.onrender.com",
   },
 };
 
