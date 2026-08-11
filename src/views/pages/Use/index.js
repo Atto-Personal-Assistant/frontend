@@ -81,7 +81,7 @@ export const Use = () => {
           <section className="conversation-panel" aria-label="Conversa com o Atto">
             <div className="panel-heading"><div><span className="eyebrow">CONVERSA</span><h2>Seu pedido, do início ao resultado</h2></div><div className="conversation-actions">{availableActions.map((action) => <button key={action.name} type="button" className="rerun-action" onClick={() => rerunAction(action)} disabled={isRunning} title={`Executar ${action.name} novamente`}>↻ {action.name}</button>)}<button className={`voice-toggle${voiceEnabled ? " enabled" : ""}`} type="button" onClick={() => setVoiceEnabled(!voiceEnabled)} aria-pressed={voiceEnabled}>⌁ Voz {voiceEnabled ? "ligada" : "desligada"}</button></div></div>
             <div className="chat-history" aria-live="polite">
-              {messages.map(({ actor, message, action }, currentIndex) => {
+              {messages.map(({ actor, message, action, actions = [] }, currentIndex) => {
                 const messageId = `${actor}-${currentIndex}`;
                 return (
                 <article key={`${actor}-${currentIndex}`} className={`message ${actor === "Atto" ? "message-agent" : "message-user"}`}>
@@ -90,7 +90,11 @@ export const Use = () => {
                   {actor === "Atto" && <div className="message-actions">
                     <button type="button" onClick={() => speakMessage(message)} title="Ler em voz alta" aria-label="Ler em voz alta">🔊</button>
                     <button type="button" onClick={() => copyMessage(messageId, message)} title="Copiar resposta">{copiedMessageId === messageId ? "Copiado" : "Copiar"}</button>
-                    {action?.operation === "repeat" && <button type="button" onClick={() => rerunAction(action)} disabled={isRunning} title={`Executar ${action.name} novamente`} aria-label={`Executar ação ${action.name} novamente`}>↻ Rerun</button>}
+                    {(actions.length ? actions : (action ? [action] : [])).map((messageAction) => (
+                      <button key={`${messageAction.operation}-${messageAction.name}`} type="button" onClick={() => rerunAction(messageAction)} disabled={isRunning} title={messageAction.name} aria-label={messageAction.name}>
+                        {messageAction.operation === "get_development_job" ? "◌ Consultar job" : "↻ Rerun"}
+                      </button>
+                    ))}
                   </div>}
                 </article>
                 );

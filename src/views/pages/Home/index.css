@@ -1,0 +1,38 @@
+.home {
+  min-height: calc(100dvh - 72px);
+  padding: clamp(48px, 8vw, 110px) clamp(20px, 6vw, 88px) 60px;
+  box-sizing: border-box;
+  color: #edf5ff;
+  background: radial-gradient(circle at 15% 5%, #244f964f, transparent 34rem), radial-gradient(circle at 88% 18%, #115b5c3d, transparent 30rem), #080d18;
+}
+.home-hero { max-width: 1240px; margin: auto; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(340px, .75fr); align-items: center; gap: clamp(48px, 8vw, 110px); }
+.home-kicker { color: #83cfff; font-size: .72rem; font-weight: 800; letter-spacing: .17em; }
+.home-copy h1 { max-width: 720px; margin: 18px 0 22px; font-size: clamp(3rem, 7vw, 6.4rem); line-height: .94; letter-spacing: -.065em; }
+.home-copy > p { max-width: 650px; margin: 0; color: #9fb0c8; font-size: clamp(1rem, 1.8vw, 1.2rem); line-height: 1.7; }
+.home-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+.home-actions a { padding: 13px 18px; border-radius: 11px; font-weight: 700; text-decoration: none; }
+.home-primary-action { color: #07101c; background: linear-gradient(135deg, #8aeaff, #8790ff); box-shadow: 0 14px 35px #4a8eff35; }
+.home-primary-action span { margin-left: 18px; }
+.home-secondary-action { color: #c3d3e9; border: 1px solid #344a68; background: #111b2a99; }
+.home-preview { padding: 22px; border: 1px solid #304765; border-radius: 24px; background: #111b2cdd; box-shadow: 0 32px 90px #02050d88; transform: rotate(1.5deg); }
+.home-preview-top { display: flex; gap: 12px; align-items: center; padding-bottom: 18px; border-bottom: 1px solid #283a54; }
+.home-preview-orb { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 14px; color: #08101e; font-weight: 900; background: linear-gradient(135deg, #7de3ff, #778bff); }
+.home-preview-top strong, .home-preview-top small { display: block; }
+.home-preview-top small { margin-top: 4px; color: #7f94af; font-size: .72rem; }
+.home-preview-top i { display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: #54d69a; }
+.home-preview-message { width: fit-content; max-width: 82%; margin-top: 18px; padding: 12px 14px; border-radius: 14px; color: #dce9fa; font-size: .88rem; line-height: 1.5; }
+.home-preview-message.user { margin-left: auto; background: linear-gradient(135deg, #2867ae, #514fc0); border-top-right-radius: 4px; }
+.home-preview-message.agent { background: #192b45; border: 1px solid #315078; border-top-left-radius: 4px; }
+.home-preview-steps { display: flex; align-items: center; gap: 11px; margin: 18px 5px 0; color: #7ff0c0; }
+.home-preview-steps span { display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid #3d9d79; border-radius: 50%; }
+.home-preview-steps strong, .home-preview-steps small { display: block; }
+.home-preview-steps strong { color: #d9e8f9; font-size: .8rem; }
+.home-preview-steps small { margin-top: 3px; color: #778da9; }
+.home-capabilities { max-width: 1240px; margin: clamp(70px, 10vw, 130px) auto 0; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid #293a52; }
+.home-capabilities article { padding: 28px 30px 10px 0; }
+.home-capabilities article + article { padding-left: 30px; border-left: 1px solid #293a52; }
+.home-capabilities span { color: #6193ca; font-size: .7rem; font-weight: 800; letter-spacing: .12em; }
+.home-capabilities h2 { margin: 12px 0 8px; font-size: 1.05rem; }
+.home-capabilities p { margin: 0; color: #8296b1; font-size: .86rem; line-height: 1.6; }
+@media (max-width: 850px) { .home-hero { grid-template-columns: 1fr; } .home-preview { max-width: 520px; transform: none; } }
+@media (max-width: 600px) { .home { min-height: calc(100dvh - 60px); padding: 42px 18px; } .home-copy h1 { font-size: clamp(2.8rem, 15vw, 4.3rem); } .home-actions { flex-direction: column; } .home-actions a { text-align: center; } .home-preview { padding: 16px; border-radius: 18px; } .home-capabilities { grid-template-columns: 1fr; margin-top: 65px; } .home-capabilities article, .home-capabilities article + article { padding: 24px 0; border-left: 0; border-bottom: 1px solid #293a52; } }

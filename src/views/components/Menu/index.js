@@ -1,4 +1,4 @@
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { PAGES } from "application/constants";
 
@@ -11,12 +11,12 @@ export const Menu = () => {
     <ul className="menu">
       {PAGES.map(({ path, label }, index) => (
         <li key={index}>
-          <a
+          <Link
             className={location.pathname === path ? "activated" : ""}
-            href={path}
+            to={path}
           >
             {label}
-          </a>
+          </Link>
         </li>
       ))}
     </ul>

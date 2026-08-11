@@ -1,10 +1,5 @@
 import { Config } from "application/constants";
 
-const websocketUrl = () => {
-  const baseUrl = Config.STAGE.BASE_URL.replace(/^http/, "ws");
-  return `${baseUrl}/agent/ws`;
-};
-
 const agentUrl = () => `${Config.STAGE.BASE_URL}/agent`;
 
 const connectOverHttp = ({ input, language, sessionId, command, onEvent, onError, onClose }) => {
@@ -51,7 +46,7 @@ const connectOverHttp = ({ input, language, sessionId, command, onEvent, onError
         ? `Em resposta à pergunta "${pendingQuestion}": ${String(answer).trim()}`
         : String(answer).trim();
       pendingQuestion = null;
-      run(nextInput);
+      run(nextInput, { operation: "answer_question", answer: String(answer).trim() });
       return true;
     },
   };
@@ -81,24 +76,9 @@ export const getAgentSession = async (sessionId) => {
 };
 
 export const connectToAgent = ({ input, language, sessionId, command, onEvent, onError, onClose }) => {
-  if (Config.STAGE.AGENT_TRANSPORT === "http") {
-    return connectOverHttp({ input, language, sessionId, command, onEvent, onError, onClose });
-  }
-
-  const socket = new WebSocket(websocketUrl());
-
-  socket.onopen = () => socket.send(JSON.stringify({ type: "start", input, language, session_id: sessionId, command }));
-  socket.onmessage = ({ data }) => onEvent(JSON.parse(data));
-  socket.onerror = onError;
-  socket.onclose = onClose;
-
-  return socket;
+  return connectOverHttp({ input, language, sessionId, command, onEvent, onError, onClose });
 };
 
 export const sendAgentAnswer = (socket, questionId, answer) => {
-  if (typeof socket?.sendAnswer === "function") return socket.sendAnswer(answer);
-  if (socket?.readyState !== WebSocket.OPEN) return false;
-
-  socket.send(JSON.stringify({ type: "answer", question_id: questionId, answer }));
-  return true;
+  return typeof socket?.sendAnswer === "function" ? socket.sendAnswer(answer) : false;
 };

@@ -148,10 +148,11 @@ export const useUse = () => {
         if (!active || !Array.isArray(canonicalMessages) || !canonicalMessages.length) return;
         setChats((current) => current.map((chat) => chat.id === activeChat.id ? {
           ...chat,
-          messages: canonicalMessages.map(({ role, content, action }) => ({
+          messages: canonicalMessages.map(({ role, content, action, actions }) => ({
             actor: role === "assistant" ? "Atto" : "user",
             message: content,
             action: action || null,
+            actions: actions || (action ? [action] : []),
           })),
         } : chat));
       })
@@ -175,10 +176,10 @@ export const useUse = () => {
     }));
   };
 
-  const addAssistantMessage = (message, shouldSpeak = true, action = null) => {
+  const addAssistantMessage = (message, shouldSpeak = true, action = null, actions = []) => {
     updateActiveChat((chat) => ({
       ...chat,
-      messages: [...chat.messages, { actor: "Atto", message, action }],
+      messages: [...chat.messages, { actor: "Atto", message, action, actions: actions.length ? actions : (action ? [action] : []) }],
     }));
     if (shouldSpeak && voiceEnabled) playSpeech(message);
   };
@@ -200,8 +201,8 @@ export const useUse = () => {
 
     if (event.type === "result") {
       setStatus("");
-      addAssistantMessage(event.message, true, event.action);
-      if (event.action) {
+      addAssistantMessage(event.message, true, event.action, event.actions || []);
+      if (event.action?.operation === "repeat") {
         setAvailableActions((current) => current.some(({ name }) => name === event.action.name)
           ? current
           : [...current, event.action]);
@@ -290,12 +291,20 @@ export const useUse = () => {
   };
 
   const rerunAction = (action) => {
-    if (isRunning || !action?.name) return;
-    const message = `Reexecutar: ${action.name}`;
+    if (isRunning || !action?.operation) return;
+    const isMessageRerun = action.operation === "rerun_message";
+    const isJobStatus = action.operation === "get_development_job";
+    if (isMessageRerun && !action.request_id) return;
+    if (isJobStatus && !action.job_id) return;
+    if (!isMessageRerun && !action.name) return;
+    const label = isMessageRerun ? "solicitação" : action.name;
+    const message = isMessageRerun
+      ? "Rerun da solicitação anterior"
+      : isJobStatus ? `Consultar job ${action.job_id}` : `Reexecutar: ${action.name}`;
     updateActiveChat((chat) => ({
       ...chat,
       messages: [...chat.messages, { actor: "user", message }],
-      activities: [...chat.activities, { id: `${Date.now()}-rerun`, at: new Date(), icon: "↻", title: "Reexecutando ação", detail: action.name, state: "active" }],
+      activities: [...chat.activities, { id: `${Date.now()}-rerun`, at: new Date(), icon: "↻", title: "Reexecutando ação", detail: label, state: "active" }],
     }));
     setStatus("Conectando ao agent...");
     setIsRunning(true);
@@ -303,7 +312,11 @@ export const useUse = () => {
       input: message,
       language: language(),
       sessionId: activeChat.sessionId,
-      command: { operation: "repeat", action_name: action.name },
+      command: isMessageRerun
+        ? { operation: "rerun_message", request_id: action.request_id }
+        : isJobStatus
+          ? { operation: "get_development_job", job_id: action.job_id }
+          : { operation: "repeat", action_name: action.name },
       onEvent: handleAgentEvent,
       onError: () => addAssistantMessage("Não foi possível conectar ao agent."),
       onClose: () => setIsRunning(false),

@@ -4,10 +4,6 @@ export const PAGES = [
     label: "Início",
   },
   {
-    path: "/train",
-    label: "Treino",
-  },
-  {
     path: "/use",
     label: "Usar",
   },

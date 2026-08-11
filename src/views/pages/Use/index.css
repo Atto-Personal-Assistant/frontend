@@ -1,5 +1,5 @@
 .agent-workspace {
-  /* min-height: calc(100vh - 80px); */
+  min-height: calc(100dvh - 72px);
   padding: 40px;
   color: #ecf2ff;
   background:
@@ -92,7 +92,8 @@
   background: #101827c9;
   box-shadow: 0 25px 70px #02050d55;
   backdrop-filter: blur(16px);
-  max-height: 500px;
+  height: min(680px, calc(100dvh - 184px));
+  min-height: 500px;
 }
 .conversation-panel {
   min-height: 500px;
@@ -495,25 +496,38 @@
   }
   .roadmap-panel {
     grid-column: 1 / -1;
+    height: auto;
+    min-height: 260px;
+    max-height: 420px;
   }
 }
 @media (max-width: 700px) {
   .agent-workspace {
-    padding: 25px 15px 35px;
+    min-height: calc(100dvh - 60px);
+    padding: 22px 12px 32px;
   }
   .agent-grid {
     grid-template-columns: 1fr;
   }
   .conversation-panel {
-    min-height: 540px;
+    order: 1;
+    width: 100%;
+    height: calc(100dvh - 118px);
+    min-height: 520px;
+    border-radius: 17px;
   }
   .roadmap-panel {
-    order: 2;
+    order: 3;
     grid-column: auto;
+    width: 100%;
+    max-height: 390px;
   }
   .chat-list-panel {
     order: 2;
-    max-height: 190px;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    max-height: 220px;
   }
   .agent-hero {
     margin-bottom: 20px;
@@ -526,25 +540,41 @@
     margin: 0;
   }
   .message {
-    max-width: 90%;
+    max-width: 88%;
   }
+  .panel-heading { align-items: flex-start; gap: 12px; }
+  .conversation-actions { max-width: 48%; }
+  .chat-list { flex-direction: row; overflow-x: auto; overflow-y: hidden; }
+  .chat-list-item { min-width: min(250px, 75vw); }
 }
 @media (max-width: 480px) {
+  .agent-hero { align-items: flex-start; }
+  .agent-brand { gap: 10px; }
+  .agent-orb { width: 40px; height: 40px; border-radius: 13px; }
+  .agent-hero h1 { font-size: 1.25rem; }
   .panel-heading {
-    padding: 18px;
+    padding: 16px;
   }
   .panel-heading h2 {
     font-size: 0.92rem;
   }
   .chat-history {
-    padding: 18px;
+    padding: 16px;
+    gap: 11px;
   }
   .chat-request {
-    margin: 0 18px;
+    margin: 0 12px;
+    padding: 8px;
   }
   .input-hint {
-    margin-left: 24px;
+    margin: 9px 18px 15px;
   }
+  .message { max-width: 94%; padding: 11px 12px; }
+  .markdown-message p { font-size: .88rem; overflow-wrap: anywhere; }
+  .markdown-message ul { padding-left: 17px; font-size: .86rem; }
+  .message-actions { flex-wrap: wrap; }
+  .conversation-actions { max-width: 44%; gap: 5px; }
+  .rerun-action { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .voice-toggle {
     font-size: 0;
     width: 33px;
