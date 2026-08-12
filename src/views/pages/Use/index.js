@@ -67,14 +67,36 @@ export const Use = () => {
     const deviceId = window.localStorage.getItem("atto.active-device");
     if (!deviceId) return undefined;
     const base = new URL(Config.STAGE.BASE_URL);
-    const socket = new WebSocket(`${base.protocol === "https:" ? "wss:" : "ws:"}//${base.host}/devices/${encodeURIComponent(deviceId)}/events`);
-    socket.onmessage = (event) => {
+    const socketUrl = `${base.protocol === "https:" ? "wss:" : "ws:"}//${base.host}/devices/${encodeURIComponent(deviceId)}/events`;
+    let socket;
+    let reconnectTimer;
+    let stopped = false;
+
+    const connect = () => {
+      if (stopped) return;
       try {
-        const command = JSON.parse(event.data);
-        if (["share_content", "view_content", "view_media"].includes(command.action)) setSharedContent({ ...(command.payload || {}), sender: command.sender, media: command.action === "view_media" });
-      } catch { /* Ignore malformed device events. */ }
+        socket = new WebSocket(socketUrl);
+        socket.onmessage = (event) => {
+          try {
+            const command = JSON.parse(event.data);
+            if (["share_content", "view_content", "view_media"].includes(command.action)) setSharedContent({ ...(command.payload || {}), sender: command.sender, media: command.action === "view_media" });
+          } catch { /* Ignore malformed device events. */ }
+        };
+        socket.onclose = () => {
+          if (!stopped) reconnectTimer = window.setTimeout(connect, 3000);
+        };
+        socket.onerror = () => socket.close();
+      } catch {
+        reconnectTimer = window.setTimeout(connect, 3000);
+      }
     };
-    return () => socket.close();
+
+    connect();
+    return () => {
+      stopped = true;
+      window.clearTimeout(reconnectTimer);
+      socket?.close();
+    };
   }, []);
   const openShare = async (content) => {
     setShareError("");
