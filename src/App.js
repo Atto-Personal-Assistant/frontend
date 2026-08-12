@@ -1,8 +1,16 @@
 import React from "react";
 import Routes from "routes";
 
-import "views/styles/globalStyles.css"
+import { DesktopTitlebar } from "views/components/DesktopTitlebar";
 
-const App = () => <Routes />;
+import "views/styles/globalStyles.css";
+
+const App = () => (
+  <>
+    <DesktopTitlebar />
+
+    <Routes />
+  </>
+);
 
 export default App;
