@@ -10,6 +10,7 @@
     "frontendDist": "../build"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
@@ -20,6 +21,7 @@
         "minHeight": 520,
         "decorations": false,
         "transparent": true,
+        "backgroundColor": "#00000000",
         "resizable": true,
         "shadow": true
       }
