@@ -532,3 +532,30 @@
     font-size: 0.9rem;
   }
 }
+.shared-content-backdrop { position: fixed; inset: 0; z-index: 35; display: grid; place-items: center; padding: 24px; background: rgba(7, 7, 13, .72); backdrop-filter: blur(8px); }
+.shared-content-banner { position: relative; width: min(560px, 100%); padding: 34px; border: 1px solid #7165d9; border-radius: 20px; background: #1e1d31; color: #fff; box-shadow: 0 22px 70px rgba(0,0,0,.45); }
+.shared-content-banner button { position: absolute; top: 8px; right: 12px; border: 0; background: transparent; color: #aaa8b8; font-size: 24px; cursor: pointer; }
+.shared-content-banner span { color: #9b8fff; font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
+.shared-content-banner h2 { margin: 12px 0 8px; }
+.shared-content-banner p { white-space: pre-wrap; line-height: 1.5; }
+.shared-media { display: block; width: 100%; max-height: 58vh; object-fit: contain; border-radius: 10px; background: #0b0b10; }
+.chat-media-preview { display: block; max-width: min(360px, 100%); max-height: 280px; margin: 12px 0; border-radius: 10px; object-fit: contain; }
+.chat-attach { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 50%; background: #ececf3; color: #55556a; cursor: pointer; }
+.chat-attach input { display: none; }
+.share-file-name { margin: 10px 0; color: #c7c4d8; font-size: 13px; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .shared-content-backdrop, .share-modal-backdrop { padding: 14px; }
+  .shared-content-banner, .share-modal { width: 100%; box-sizing: border-box; padding: 24px 20px; border-radius: 16px; }
+  .shared-content-banner h2, .share-modal h2 { font-size: 21px; padding-right: 18px; }
+  .shared-content-banner p { max-height: 52vh; overflow-y: auto; font-size: 15px; }
+}
+.share-modal-backdrop { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 24px; background: rgba(7, 7, 13, .72); backdrop-filter: blur(8px); }
+.share-modal { position: relative; width: min(440px, 100%); padding: 30px; border: 1px solid #3f3c62; border-radius: 22px; background: #1d1c2e; color: #fff; box-shadow: 0 24px 80px rgba(0,0,0,.45); }
+.share-modal h2 { margin: 12px 0 24px; font-size: 24px; }
+.share-modal-close { position: absolute; top: 12px; right: 16px; border: 0; background: transparent; color: #aaa8b8; font-size: 25px; cursor: pointer; }
+.share-device-list { display: grid; gap: 10px; }
+.share-device-list button { display: flex; align-items: center; gap: 13px; width: 100%; padding: 12px; border: 1px solid #3b394e; border-radius: 12px; background: #25243a; color: #fff; text-align: left; cursor: pointer; }
+.share-device-list button:hover { border-color: #8375ff; background: #302d51; }
+.share-device-list small { display: block; margin-top: 3px; color: #aaa8b8; }
+.share-device-avatar { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 10px; background: #7165d9; font-weight: 700; }
+.share-error { color: #ff9f9f; }

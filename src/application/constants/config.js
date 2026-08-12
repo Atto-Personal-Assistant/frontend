@@ -14,6 +14,12 @@ const STAGE = {
   },
 };
 
+const apiOverride = process.env.REACT_APP_API_URL;
+if (apiOverride) {
+  const normalizedApiUrl = apiOverride.endsWith("/") ? apiOverride.slice(0, -1) : apiOverride;
+  Object.values(STAGE).forEach((stage) => { stage.BASE_URL = normalizedApiUrl; });
+}
+
 const Config = {
   ROUTES: {
     NEURAL_NEWTWORK: {

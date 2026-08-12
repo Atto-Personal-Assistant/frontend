@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { connectToAgent, deleteAgentSession, getAgentSession, listAgentSessionActions, sendAgentAnswer } from "infrastructure/services";
+import { uploadChatMedia } from "infrastructure/services/devices";
 
 const language = () => "pt-BR";
 const chatStorageKey = "atto.agent.chats.v1";
@@ -127,6 +128,7 @@ export const useUse = () => {
   const [chats, setChats] = useState(initialChats.current);
   const [activeChatId, setActiveChatId] = useState(initialChats.current[0].id);
   const [input, setInput] = useState("");
+  const [attachment, setAttachment] = useState(null);
   const [status, setStatus] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [pendingQuestion, setPendingQuestion] = useState(null);
@@ -293,21 +295,33 @@ export const useUse = () => {
     playSpeech(message, true);
   };
 
-  const sendRequest = () => {
+  const sendRequest = async () => {
     const message = input.trim();
-    if (!message || isRunning) return;
+    if ((!message && !attachment) || isRunning) return;
+    let media = null;
+    if (attachment) {
+      try {
+        const uploaded = await uploadChatMedia(attachment);
+        media = { ...uploaded, file: attachment };
+      } catch (reason) {
+        setStatus(reason.message);
+        return;
+      }
+    }
+    const displayMessage = message || `Mídia anexada: ${attachment.name}`;
 
     updateActiveChat((chat) => ({
       ...chat,
-      title: chat.title === "Nova conversa" ? message.slice(0, 36) : chat.title,
-      messages: [...chat.messages, { actor: "user", message }],
-      activities: [...chat.activities, { id: `${Date.now()}-request`, at: new Date(), icon: "●", title: "Nova solicitação", detail: message, state: "active" }],
+      title: chat.title === "Nova conversa" ? displayMessage.slice(0, 36) : chat.title,
+      messages: [...chat.messages, { actor: "user", message: displayMessage, media }],
+      activities: [...chat.activities, { id: `${Date.now()}-request`, at: new Date(), icon: "●", title: "Nova solicitação", detail: displayMessage, state: "active" }],
     }));
     setInput("");
+    setAttachment(null);
     setStatus(language().toLowerCase().startsWith("pt") ? "Conectando ao agent..." : "Connecting to the agent...");
     setIsRunning(true);
     socket.current = connectToAgent({
-      input: message,
+      input: message || `Analise a mídia anexada: ${attachment.name}`,
       language: language(),
       sessionId: activeChat.sessionId,
       onEvent: handleAgentEvent,
@@ -418,6 +432,8 @@ export const useUse = () => {
 
   return {
     input,
+    attachment,
+    setAttachment,
     messages,
     status,
     isRunning,

@@ -1,6 +1,10 @@
 export const PAGES = [
   {
     path: "/",
+    label: "Dispositivos",
+  },
+  {
+    path: "/home",
     label: "Início",
   },
   {
