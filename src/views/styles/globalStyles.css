@@ -17,6 +17,39 @@ html[data-atto-desktop] #root {
   background: transparent;
 }
 
+html[data-atto-desktop] .menu {
+  background: rgba(8, 14, 29, .48);
+  border-bottom-color: rgba(151, 190, 255, .16);
+  backdrop-filter: blur(22px) saturate(145%);
+  -webkit-backdrop-filter: blur(22px) saturate(145%);
+}
+
+html[data-atto-desktop] .home,
+html[data-atto-desktop] .agent-workspace,
+html[data-atto-desktop] .devices-page {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(61, 117, 215, .32), transparent 28rem),
+    radial-gradient(circle at 92% 14%, rgba(30, 172, 169, .18), transparent 24rem),
+    transparent;
+}
+
+html[data-atto-desktop] .home-preview,
+html[data-atto-desktop] .conversation-panel,
+html[data-atto-desktop] .chat-list-panel {
+  background: rgba(15, 27, 48, .46);
+  border-color: rgba(151, 190, 255, .2);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .2);
+  backdrop-filter: blur(24px) saturate(135%);
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+}
+
+html[data-atto-desktop] .device-card {
+  background: rgba(255, 255, 255, .07);
+  border-color: rgba(191, 205, 255, .14);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
 a,
 h1,
 h2,
