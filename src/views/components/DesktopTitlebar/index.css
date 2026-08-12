@@ -1,0 +1,46 @@
+.desktop-titlebar {
+  display: none;
+}
+
+@supports (-webkit-appearance: none) {
+  .desktop-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 34px;
+    padding-left: 14px;
+    color: #a9bce0;
+    background: rgba(7, 12, 25, .78);
+    border-bottom: 1px solid rgba(130, 164, 220, .18);
+    user-select: none;
+  }
+
+  .desktop-titlebar-brand {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .28em;
+  }
+
+  .desktop-window-controls {
+    display: flex;
+    height: 100%;
+  }
+
+  .desktop-window-controls button {
+    width: 46px;
+    border: 0;
+    color: #b8c7e2;
+    background: transparent;
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  .desktop-window-controls button:hover {
+    background: rgba(121, 151, 206, .2);
+  }
+
+  .desktop-window-controls .desktop-close:hover {
+    color: #fff;
+    background: #d94f68;
+  }
+}

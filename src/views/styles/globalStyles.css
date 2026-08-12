@@ -11,6 +11,12 @@ html {
 
 body { overflow-y: auto; }
 
+html[data-atto-desktop],
+html[data-atto-desktop] body,
+html[data-atto-desktop] #root {
+  background: transparent;
+}
+
 a,
 h1,
 h2,
