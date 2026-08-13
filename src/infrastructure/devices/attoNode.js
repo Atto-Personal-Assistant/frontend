@@ -2,6 +2,8 @@ import { Config } from "application/constants";
 
 const nodeUrl = (baseUrl) => {
   const url = new URL(baseUrl);
+  // Keep the transport secure when the API is served over HTTPS. Browsers
+  // block ws:// from an HTTPS page as mixed content.
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   return url;
 };
@@ -21,6 +23,9 @@ export class AttoNode {
     heartbeatMs = 30000,
     reconnectMs = 1500,
     handlers = {},
+    deviceId = null,
+    deviceToken = null,
+    onRegistered = null,
   } = {}) {
     if (!name) throw new Error("Atto Node precisa de um nome.");
     this.name = name;
@@ -32,6 +37,12 @@ export class AttoNode {
     this.heartbeatMs = heartbeatMs;
     this.reconnectMs = reconnectMs;
     this.handlers = handlers;
+    this.deviceId = deviceId;
+    this.deviceToken = deviceToken;
+    this.onRegistered = onRegistered;
+    if (typeof this.handlers["camera.capture"] === "function" && !this.capabilities.includes("camera.capture")) {
+      this.capabilities = [...this.capabilities, "camera.capture"];
+    }
     this.device = null;
     this.socket = null;
     this.heartbeatTimer = null;
@@ -55,15 +66,32 @@ export class AttoNode {
   }
 
   async register() {
+    const registration = { name: this.name, kind: this.kind, capabilities: this.capabilities };
+    if (this.deviceId) registration.device_id = this.deviceId;
+    if (this.deviceToken) registration.device_token = this.deviceToken;
     const response = await this.fetch(`${this.baseUrl}/devices/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: this.name, kind: this.kind, capabilities: this.capabilities }),
+      body: JSON.stringify(registration),
     });
-    if (!response.ok) throw new Error("Não foi possível registrar o Atto Node.");
+    if (!response.ok) {
+      const error = new Error("Não foi possível registrar o Atto Node.");
+      error.status = response.status;
+      throw error;
+    }
     const result = await response.json();
-    this.device = { ...result.device, token: result.device_token || this.device?.token };
-    if (!this.device.token) throw new Error("O servidor não retornou o token do Atto Node.");
+    this.device = {
+      ...result.device,
+      // Refreshing a registered device intentionally does not issue a new
+      // token. Keep the token used for authentication when the API omits it.
+      token: result.device_token || this.deviceToken || this.device?.token,
+    };
+    if (!this.device.token) {
+      throw new Error(`O servidor não retornou o token do Atto Node (device_id=${this.device.id || "unknown"}).`);
+    }
+    this.deviceId = this.device.id;
+    this.deviceToken = this.device.token;
+    this.onRegistered?.(this.device);
     return this.device;
   }
 
@@ -71,16 +99,22 @@ export class AttoNode {
     if (this.stopped || !this.device || this.socket) return;
     const url = nodeUrl(`${this.baseUrl}/devices/${encodeURIComponent(this.device.id)}/events`);
     url.searchParams.set("token", this.device.token);
+    console.info("Atto Node: conectando WebSocket", url.toString().replace(/token=[^&]+/, "token=***"));
     const socket = new this.WebSocket(url.toString());
     this.socket = socket;
     socket.onopen = () => {
+      console.info("Atto Node: WebSocket conectado", this.device.id);
       this.heartbeat();
       this.heartbeatTimer = window.setInterval(() => this.heartbeat(), this.heartbeatMs);
       this.handlers.connected?.(this.device);
     };
     socket.onmessage = ({ data }) => this.dispatch(JSON.parse(data));
-    socket.onerror = (error) => this.handlers.error?.(error);
+    socket.onerror = (error) => {
+      console.error("Atto Node: erro no WebSocket", error);
+      this.handlers.error?.(error);
+    };
     socket.onclose = () => {
+      console.warn("Atto Node: WebSocket fechado", this.device.id);
       window.clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
       this.socket = null;
@@ -105,14 +139,14 @@ export class AttoNode {
       const result = await handler(command.payload || {}, command);
       this.ack(command.id, true, result);
     } catch (error) {
-      this.ack(command.id, false, undefined, error.message);
+      this.ack(command.id, false, undefined, error.message, error.code);
       this.handlers.commandError?.(error, command);
     }
   }
 
-  ack(commandId, success, result, error) {
+  ack(commandId, success, result, error, errorCode) {
     if (!this.socket || this.socket.readyState !== this.WebSocket.OPEN) return;
-    this.socket.send(JSON.stringify({ command_id: commandId, success, result, error }));
+    this.socket.send(JSON.stringify({ command_id: commandId, success, result, error, error_code: errorCode }));
   }
 }
 
@@ -123,4 +157,92 @@ export const browserMusicHandler = async ({ uri, url, title }) => {
   audio.title = title || "Atto";
   await audio.play();
   return { playing: true, source };
+};
+
+let activeCameraStream = null;
+let activeCameraVideo = null;
+
+const publishCameraState = (stream) => {
+  window.dispatchEvent(new CustomEvent("atto:camera-state", { detail: { stream } }));
+};
+
+export const stopBrowserCamera = () => {
+  activeCameraStream?.getTracks().forEach((track) => track.stop());
+  if (activeCameraVideo) activeCameraVideo.srcObject = null;
+  activeCameraStream = null;
+  activeCameraVideo = null;
+  publishCameraState(null);
+};
+
+const openBrowserCamera = async () => {
+  if (activeCameraStream?.active && activeCameraVideo) return { stream: activeCameraStream, video: activeCameraVideo };
+  stopBrowserCamera();
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+  const video = document.createElement("video");
+  video.srcObject = stream;
+  video.muted = true;
+  video.autoplay = true;
+  video.playsInline = true;
+  try {
+    await new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        const error = new Error("A câmera não ficou pronta a tempo.");
+        error.code = "camera_timeout";
+        reject(error);
+      }, 5000);
+      const ready = () => { window.clearTimeout(timeout); resolve(); };
+      video.onloadeddata = ready;
+      video.onerror = () => { window.clearTimeout(timeout); reject(new Error("Não foi possível ler o vídeo da câmera.")); };
+      if (video.readyState >= 2) ready();
+      else video.play().catch((error) => { window.clearTimeout(timeout); reject(error); });
+    });
+  } catch (error) {
+    stream.getTracks().forEach((track) => track.stop());
+    video.srcObject = null;
+    throw error;
+  }
+  activeCameraStream = stream;
+  activeCameraVideo = video;
+  stream.getVideoTracks().forEach((track) => {
+    track.onended = () => {
+      if (activeCameraStream === stream) stopBrowserCamera();
+    };
+  });
+  publishCameraState(stream);
+  return { stream, video };
+};
+
+export const browserCameraHandler = async ({ camera_id: cameraId = "default" } = {}) => {
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    const error = new Error("A câmera exige HTTPS ou localhost.");
+    error.code = "camera_insecure_context";
+    throw error;
+  }
+  let camera;
+  try {
+    camera = await openBrowserCamera();
+  } catch (error) {
+    const permissionError = new Error(
+      error.name === "NotAllowedError"
+        ? "A permissão da câmera foi negada no navegador ou no sistema operacional."
+        : error.name === "NotFoundError"
+          ? "Nenhuma câmera foi encontrada neste dispositivo."
+          : `Não foi possível acessar a câmera: ${error.message || error.name}`,
+    );
+    permissionError.code = error.name === "NotAllowedError" ? "camera_permission_denied" : "camera_unavailable";
+    throw permissionError;
+  }
+  const track = camera.stream.getVideoTracks()[0];
+  if (!track) {
+    stopBrowserCamera();
+    const error = new Error("Nenhuma câmera disponível neste dispositivo.");
+    error.code = "camera_unavailable";
+    throw error;
+  }
+  const settings = track.getSettings();
+  const canvas = document.createElement("canvas");
+  canvas.width = settings.width || camera.video.videoWidth;
+  canvas.height = settings.height || camera.video.videoHeight;
+  canvas.getContext("2d").drawImage(camera.video, 0, 0, canvas.width, canvas.height);
+  return { camera_id: cameraId, media_type: "image/jpeg", data_url: canvas.toDataURL("image/jpeg", 0.9), camera_open: true };
 };

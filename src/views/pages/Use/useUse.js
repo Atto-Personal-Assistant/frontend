@@ -295,8 +295,8 @@ export const useUse = () => {
     playSpeech(message, true);
   };
 
-  const sendRequest = async () => {
-    const message = input.trim();
+  const sendRequest = async (messageOverride = null) => {
+    const message = messageOverride === null ? input.trim() : String(messageOverride).trim();
     if ((!message && !attachment) || isRunning) return;
     let media = null;
     if (attachment) {
@@ -328,6 +328,11 @@ export const useUse = () => {
       onError: () => addAssistantMessage("Não foi possível conectar ao agent."),
       onClose: () => setIsRunning(false),
     });
+  };
+
+  const resendMessage = (message) => {
+    if (!message || isRunning) return;
+    sendRequest(message);
   };
 
   const rerunAction = (action) => {
@@ -440,6 +445,7 @@ export const useUse = () => {
     pendingQuestion,
     handleInput,
     sendRequest,
+    resendMessage,
     answerQuestion,
     isListening,
     startListening,

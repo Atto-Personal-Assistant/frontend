@@ -47,4 +47,36 @@ describe("AttoNode", () => {
 
     expect(socket.send).toHaveBeenCalledWith(expect.stringContaining('"success":false'));
   });
+
+  test("advertises camera capture only when a camera handler is installed", () => {
+    const node = new AttoNode({
+      name: "Notebook",
+      handlers: { "camera.capture": jest.fn() },
+    });
+
+    expect(node.capabilities).toContain("camera.capture");
+  });
+
+  test("registers with its own persisted identity", async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(response({ device: { id: "device-a" }, device_token: "token-a" }));
+    const node = new AttoNode({
+      name: "Notebook",
+      deviceId: "device-a",
+      deviceToken: "token-a",
+      fetchImpl,
+    });
+
+    await node.register();
+
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({ device_id: "device-a", device_token: "token-a" });
+  });
+
+  test("keeps its persisted token when refreshing an existing device", async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(response({ device: { id: "device-a" } }));
+    const node = new AttoNode({ name: "Notebook", deviceId: "device-a", deviceToken: "token-a", fetchImpl });
+
+    await node.register();
+
+    expect(node.device.token).toBe("token-a");
+  });
 });

@@ -1,6 +1,55 @@
 import { Config } from "application/constants";
 
-export { AttoNode, browserMusicHandler } from "../../devices/attoNode";
+import { AttoNode, browserMusicHandler, browserCameraHandler, stopBrowserCamera } from "../../devices/attoNode";
+
+export { AttoNode, browserMusicHandler, browserCameraHandler, stopBrowserCamera };
+
+const LOCAL_NODE_IDENTITY = "atto.local-node.identity";
+
+const newDeviceId = () => {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `browser-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+const readLocalNodeIdentity = () => {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(LOCAL_NODE_IDENTITY) || "null");
+    if (stored?.id) return stored;
+  } catch (_) {
+    // Invalid local state is replaced below.
+  }
+  return { id: newDeviceId(), token: null };
+};
+
+export const startLocalAttoNode = async ({ name = "Este dispositivo", allowRecovery = true } = {}) => {
+  const identity = readLocalNodeIdentity();
+  const handlers = { "music.play": browserMusicHandler };
+  if (navigator.mediaDevices?.getUserMedia) handlers["camera.capture"] = browserCameraHandler;
+  const node = new AttoNode({
+    name,
+    kind: "desktop",
+    // An ID without its token cannot authenticate an existing device. In
+    // that case register a fresh identity instead of creating a tokenless node.
+    deviceId: identity.token ? identity.id : newDeviceId(),
+    deviceToken: identity.token || null,
+    handlers,
+    onRegistered: (device) => {
+      window.localStorage.setItem(LOCAL_NODE_IDENTITY, JSON.stringify({ id: device.id, token: device.token }));
+    },
+  });
+  try {
+    await node.start();
+    return node;
+  } catch (error) {
+    // A stale or partially persisted identity may be accepted by an older
+    // API but still return no token. Discard it and perform one fresh pair.
+    if (allowRecovery && (error.status === 401 || String(error.message || "").includes("não retornou o token"))) {
+      window.localStorage.removeItem(LOCAL_NODE_IDENTITY);
+      return startLocalAttoNode({ name, allowRecovery: false });
+    }
+    throw error;
+  }
+};
 
 const headers = () => ({
   "Content-Type": "application/json",

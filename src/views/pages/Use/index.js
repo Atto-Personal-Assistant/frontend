@@ -60,7 +60,7 @@ export const Use = () => {
   const [shareFile, setShareFile] = React.useState(null);
   const {
     input, setAttachment, messages, status, isRunning, pendingQuestion,
-    isListening, handleInput, sendRequest, answerQuestion, startListening,
+    isListening, handleInput, sendRequest, resendMessage, answerQuestion, startListening,
     voiceEnabled, setVoiceEnabled, isSpeaking, stopSpeech,
     copiedMessageId, copyMessage, speakMessage, rerunAction, availableActions,
     chats, activeChatId, createNewChat, selectChat, deleteChat,
@@ -133,6 +133,12 @@ export const Use = () => {
   const updateScrollAffordance = () => {
     const element = chatHistoryRef.current;
     if (!element) return;
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.actor === "user") {
+      element.scrollTo({ top: element.scrollHeight, behavior: "smooth" });
+      setShowLatestButton(false);
+      return;
+    }
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
     setShowLatestButton(distanceFromBottom > 120);
   };
@@ -188,7 +194,7 @@ export const Use = () => {
             </div>
           </aside>
           <section className="conversation-panel" aria-label="Conversa com o Atto">
-            <div className="panel-heading"><div className="conversation-heading"><button type="button" className="history-toggle" onClick={() => setHistoryVisible(!historyVisible)} aria-expanded={historyVisible} aria-controls="conversation-history" title={historyVisible ? "Ocultar histórico" : "Mostrar histórico"}>☰</button><div><span className="eyebrow">CONVERSA</span><h2>Seu pedido, do início ao resultado</h2></div></div><div className="conversation-actions">{availableActions.map((action) => <button key={action.name} type="button" className="rerun-action" onClick={() => rerunAction(action)} disabled={isRunning} title={`Executar ${action.name} novamente`}>↻ {action.name}</button>)}<button className={`voice-toggle${voiceEnabled ? " enabled" : ""}`} type="button" onClick={() => setVoiceEnabled(!voiceEnabled)} aria-pressed={voiceEnabled}>⌁ Voz {voiceEnabled ? "ligada" : "desligada"}</button></div></div>
+            <div className="panel-heading"><div className="conversation-heading"><button type="button" className="history-toggle" onClick={() => setHistoryVisible(!historyVisible)} aria-expanded={historyVisible} aria-controls="conversation-history" title={historyVisible ? "Ocultar histórico" : "Mostrar histórico"}>☰</button><div><span className="eyebrow">CONVERSA</span><h2>Seu pedido, do início ao resultado</h2></div></div><div className="conversation-actions">{availableActions.map((action) => { const isJob = action.operation === "get_development_job"; const label = isJob ? "Consultar job" : "Reexecutar ação"; return <button key={action.name} type="button" className="rerun-action" onClick={() => rerunAction(action)} disabled={isRunning} title={`${label}: ${action.name}`} aria-label={`${label}: ${action.name}`}>{isJob ? "◌" : "↻"}</button>; })}<button className={`voice-toggle${voiceEnabled ? " enabled" : ""}`} type="button" onClick={() => setVoiceEnabled(!voiceEnabled)} aria-pressed={voiceEnabled} title={voiceEnabled ? "Desligar voz" : "Ligar voz"} aria-label={voiceEnabled ? "Desligar voz" : "Ligar voz"}>⌁</button></div></div>
             <div ref={chatHistoryRef} className="chat-history" aria-live="polite">
               {messages.map(({ actor, message, media, action, actions = [] }, currentIndex) => {
                 const messageId = `${actor}-${currentIndex}`;
@@ -199,13 +205,15 @@ export const Use = () => {
                   {media?.media_type?.startsWith("image/") && <img className="chat-media-preview" src={`${Config.STAGE.BASE_URL}${media.url}`} alt={media.name} />}
                   {media?.media_type?.startsWith("video/") && <video className="chat-media-preview" src={`${Config.STAGE.BASE_URL}${media.url}`} controls />}
                   {media?.media_type?.startsWith("audio/") && <audio src={`${Config.STAGE.BASE_URL}${media.url}`} controls />}
-                  {(actor === "Atto" || media) && <div className="message-actions">
+                  {(actor === "Atto" || actor === "user" || media) && <div className="message-actions">
+                    {actor === "user" && <><button type="button" onClick={() => resendMessage(message)} disabled={isRunning} title="Re-enviar mensagem" aria-label="Re-enviar mensagem">↻</button>
+                    <button type="button" onClick={() => copyMessage(messageId, message)} title={copiedMessageId === messageId ? "Mensagem copiada" : "Copiar mensagem"} aria-label={copiedMessageId === messageId ? "Mensagem copiada" : "Copiar mensagem"}>{copiedMessageId === messageId ? "✓" : "⧉"}</button></>}
                     {actor === "Atto" && <><button type="button" className={isSpeaking ? "stop-speech" : ""} onClick={() => isSpeaking ? stopSpeech() : speakMessage(message)} title={isSpeaking ? "Parar áudio" : "Ler em voz alta"} aria-label={isSpeaking ? "Parar áudio" : "Ler em voz alta"}>{isSpeaking ? "⏹" : "🔊"}</button>
-                    <button type="button" onClick={() => copyMessage(messageId, message)} title="Copiar resposta">{copiedMessageId === messageId ? "Copiado" : "Copiar"}</button></>}
-                    <button type="button" onClick={() => { setShareFile(media?.file || null); openShare({ title: actor === "Atto" ? "Mensagem do Atto" : "Mídia anexada", content: message }); }} title="Compartilhar mensagem">↗ Compartilhar</button>
+                    <button type="button" onClick={() => copyMessage(messageId, message)} title={copiedMessageId === messageId ? "Resposta copiada" : "Copiar resposta"} aria-label={copiedMessageId === messageId ? "Resposta copiada" : "Copiar resposta"}>{copiedMessageId === messageId ? "✓" : "⧉"}</button></>}
+                    <button type="button" onClick={() => { setShareFile(media?.file || null); openShare({ title: actor === "Atto" ? "Mensagem do Atto" : "Mídia anexada", content: message }); }} title="Compartilhar mensagem" aria-label="Compartilhar mensagem">↗</button>
                     {actor === "Atto" && (actions.length ? actions : (action ? [action] : [])).map((messageAction) => (
                       <button key={`${messageAction.operation}-${messageAction.name}`} type="button" onClick={() => rerunAction(messageAction)} disabled={isRunning} title={messageAction.name} aria-label={messageAction.name}>
-                        {messageAction.operation === "get_development_job" ? "◌ Consultar job" : "↻ Rerun"}
+                        {messageAction.operation === "get_development_job" ? "◌" : "↻"}
                       </button>
                     ))}
                   </div>}
