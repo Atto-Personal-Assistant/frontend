@@ -1,14 +1,14 @@
 export const PAGES = [
   {
     path: "/",
-    label: "Dispositivos",
+    label: "Conectar",
   },
   {
     path: "/home",
-    label: "Início",
+    label: "Visão geral",
   },
   {
     path: "/use",
-    label: "Usar",
+    label: "Conversar",
   },
 ];

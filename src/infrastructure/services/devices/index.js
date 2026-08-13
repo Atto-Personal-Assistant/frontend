@@ -23,7 +23,18 @@ const readLocalNodeIdentity = () => {
 
 export const startLocalAttoNode = async ({ name = "Este dispositivo", allowRecovery = true } = {}) => {
   const identity = readLocalNodeIdentity();
-  const handlers = { "music.play": browserMusicHandler };
+  const showSharedContent = (media = false) => async (payload, command) => {
+    window.dispatchEvent(new CustomEvent("atto:shared-content", {
+      detail: { ...payload, sender: command.sender, media },
+    }));
+    return { displayed: true };
+  };
+  const handlers = {
+    "music.play": browserMusicHandler,
+    "share_content": showSharedContent(false),
+    "view_content": showSharedContent(false),
+    "view_media": showSharedContent(true),
+  };
   if (navigator.mediaDevices?.getUserMedia) handlers["camera.capture"] = browserCameraHandler;
   const node = new AttoNode({
     name,

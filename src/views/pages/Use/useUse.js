@@ -5,13 +5,20 @@ import { uploadChatMedia } from "infrastructure/services/devices";
 
 const language = () => "pt-BR";
 const chatStorageKey = "atto.agent.chats.v1";
+const handsFreeStorageKey = "atto.voice.hands-free";
+
+export const voiceCommandFromTranscript = (transcript, mode) => {
+  const normalized = String(transcript || "").trim();
+  if (mode !== "hands-free") return normalized;
+  return normalized.match(/^\s*(?:atto|ato)[,.:;!\s]+(.+)$/i)?.[1]?.trim() || "";
+};
 
 const createChat = () => ({
   id: window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
   sessionId: window.crypto?.randomUUID?.() || `session-${Date.now()}-${Math.random()}`,
   title: "Nova conversa",
   createdAt: new Date().toISOString(),
-  messages: [{ actor: "Atto", message: "Como eu posso te ajudar?" }],
+  messages: [],
   activities: [],
 });
 
@@ -133,17 +140,34 @@ export const useUse = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [pendingQuestion, setPendingQuestion] = useState(null);
   const [isListening, setIsListening] = useState(false);
+  const [listeningMode, setListeningMode] = useState(null);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
+  const [handsFree, setHandsFree] = useState(() => window.localStorage.getItem(handsFreeStorageKey) === "true");
+  const [voiceCommandQueue, setVoiceCommandQueue] = useState([]);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState(null);
   const [availableActions, setAvailableActions] = useState([]);
   const recognition = useRef(null);
+  const handsFreeRef = useRef(handsFree);
+  const isRunningRef = useRef(isRunning);
+  const isSpeakingRef = useRef(isSpeaking);
+  const pendingQuestionRef = useRef(pendingQuestion);
+  const sendRequestRef = useRef(null);
+  const answerQuestionRef = useRef(null);
 
   const activeChat = chats.find(({ id }) => id === activeChatId) || chats[0];
   const messages = activeChat?.messages || [];
   const activities = activeChat?.activities || [];
+  const voiceSupported = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  useEffect(() => { handsFreeRef.current = handsFree; }, [handsFree]);
+  useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
+  useEffect(() => { isSpeakingRef.current = isSpeaking; }, [isSpeaking]);
+  useEffect(() => { pendingQuestionRef.current = pendingQuestion; }, [pendingQuestion]);
 
   useEffect(() => () => {
+    handsFreeRef.current = false;
     socket.current?.close();
     recognition.current?.abort?.();
     cancelActiveSpeech.current?.();
@@ -368,9 +392,12 @@ export const useUse = () => {
     });
   };
 
-  const startListening = () => {
-    if (isListening) {
-      recognition.current?.stop?.();
+  const startListening = (mode = "dictation", restarting = false) => {
+    if (isListening && !restarting) {
+      if (listeningMode !== mode) {
+        recognition.current?.abort?.();
+        window.setTimeout(() => startListening(mode, true), 120);
+      } else recognition.current?.stop?.();
       return;
     }
 
@@ -381,21 +408,73 @@ export const useUse = () => {
     }
 
     const instance = new SpeechRecognition();
-    instance.lang = language(input);
-    instance.interimResults = false;
+    instance.lang = language();
+    instance.continuous = mode === "hands-free";
+    instance.interimResults = true;
     instance.maxAlternatives = 1;
     instance.onstart = () => {
       setIsListening(true);
-      setStatus("Ouvindo... fale sua mensagem.");
+      setListeningMode(mode);
+      setVoiceTranscript("");
+      setStatus(mode === "hands-free" ? "Mãos livres ativo · diga “Atto” e o seu pedido." : "Ouvindo... envie sua mensagem ao terminar de falar.");
     };
     instance.onresult = (event) => {
-      setInput(event.results[0][0].transcript);
-      setStatus("Mensagem transcrita. Revise ou envie.");
+      let interim = "";
+      const finals = [];
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const transcript = event.results[index][0].transcript.trim();
+        if (event.results[index].isFinal) finals.push(transcript);
+        else interim += `${transcript} `;
+      }
+      setVoiceTranscript(interim.trim() || finals.join(" "));
+      finals.forEach((transcript) => {
+        const command = voiceCommandFromTranscript(transcript, mode);
+        if (!command) return;
+        if (isSpeakingRef.current) stopSpeech();
+        setInput(command);
+        setVoiceCommandQueue((current) => [...current, command]);
+        setStatus(isRunningRef.current ? `Pedido na fila: “${command}”` : "Pedido de voz recebido.");
+        if (mode === "dictation") instance.stop();
+      });
     };
-    instance.onerror = () => setStatus("Não foi possível captar o áudio. Verifique a permissão do microfone.");
-    instance.onend = () => setIsListening(false);
+    instance.onerror = (event) => {
+      if (event.error === "no-speech" && mode === "hands-free") return;
+      if (["not-allowed", "service-not-allowed"].includes(event.error)) {
+        setHandsFree(false);
+        handsFreeRef.current = false;
+        window.localStorage.setItem(handsFreeStorageKey, "false");
+      }
+      setStatus("Não foi possível captar o áudio. Verifique a permissão do microfone.");
+    };
+    instance.onend = () => {
+      setIsListening(false);
+      setListeningMode(null);
+      setVoiceTranscript("");
+      if (mode === "hands-free" && handsFreeRef.current && !isSpeakingRef.current) {
+        window.setTimeout(() => startListening("hands-free", true), 450);
+      }
+    };
     recognition.current = instance;
-    instance.start();
+    try { instance.start(); }
+    catch { if (!restarting) setStatus("O microfone já está inicializando."); }
+  };
+
+  const toggleHandsFree = () => {
+    if (!voiceSupported) {
+      setStatus("O modo mãos livres não é compatível com este navegador.");
+      return;
+    }
+    const next = !handsFree;
+    setHandsFree(next);
+    handsFreeRef.current = next;
+    window.localStorage.setItem(handsFreeStorageKey, String(next));
+    recognition.current?.abort?.();
+    if (next) window.setTimeout(() => startListening("hands-free", true), 100);
+    else {
+      setIsListening(false);
+      setListeningMode(null);
+      setStatus("");
+    }
   };
 
   const answerQuestion = (answer) => {
@@ -413,6 +492,17 @@ export const useUse = () => {
       setStatus(language().toLowerCase().startsWith("pt") ? "Enviando sua decisão ao agent..." : "Sending your decision to the agent...");
     }
   };
+
+  sendRequestRef.current = sendRequest;
+  answerQuestionRef.current = answerQuestion;
+
+  useEffect(() => {
+    if (!voiceCommandQueue.length || isRunning) return;
+    const command = voiceCommandQueue[0];
+    setVoiceCommandQueue((current) => current.slice(1));
+    if (pendingQuestionRef.current) answerQuestionRef.current?.(command);
+    else sendRequestRef.current?.(command);
+  }, [isRunning, voiceCommandQueue]);
 
   const deleteChat = async (chatId) => {
     if (isRunning) return;
@@ -448,6 +538,13 @@ export const useUse = () => {
     resendMessage,
     answerQuestion,
     isListening,
+    listeningMode,
+    voiceTranscript,
+    voiceSupported,
+    handsFree,
+    toggleHandsFree,
+    queuedVoiceCommand: voiceCommandQueue[0] || "",
+    queuedVoiceCount: voiceCommandQueue.length,
     startListening,
     activities,
     voiceEnabled,

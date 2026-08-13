@@ -8,7 +8,9 @@ export const Menu = () => {
   const location = useLocation();
 
   return (
-    <ul className="menu">
+    <nav className="menu" aria-label="Navegação principal">
+      <Link className="menu-brand" to="/use" aria-label="Abrir Atto"><span>A</span>ATTO</Link>
+      <ul>
       {PAGES.map(({ path, label }, index) => (
         <li key={index}>
           <Link
@@ -19,6 +21,8 @@ export const Menu = () => {
           </Link>
         </li>
       ))}
-    </ul>
+      </ul>
+      <Link className="menu-command" to="/use">Novo pedido <span>⌘ K</span></Link>
+    </nav>
   );
 };

@@ -10,15 +10,23 @@
   padding: 0 24px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 12px;
 }
+.menu ul { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; margin: 0; padding: 0; }
+.menu-brand { display: flex; align-items: center; gap: 9px; color: #e5f1ff; text-decoration: none; font-size: .78rem; font-weight: 850; letter-spacing: .15em; }
+.menu-brand span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; color: #07101c; background: linear-gradient(135deg, #8aeaff, #8790ff); letter-spacing: 0; }
+.menu-command { display: flex; align-items: center; gap: 12px; padding: 8px 11px; border: 1px solid #30435e; border-radius: 10px; color: #b7cae2; text-decoration: none; font-size: .75rem; background: #111c2c; }
+.menu-command span { color: #6f85a0; font-size: .62rem; }
 
 @media (max-width: 600px) {
   .menu {
     min-height: 60px;
     padding: 0 12px;
   }
+  .menu-brand { font-size: 0; }
+  .menu ul { position: static; transform: none; }
+  .menu-command { display: none; }
 
   .menu li a {
     padding: 8px 12px;

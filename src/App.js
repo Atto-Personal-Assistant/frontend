@@ -6,19 +6,67 @@ import { DesktopTitlebar } from "views/components/DesktopTitlebar";
 
 import "views/styles/globalStyles.css";
 
+const CameraPreview = ({ stream, onClose }) => {
+  const video = React.useRef(null);
+  const windowRef = React.useRef(null);
+  const drag = React.useRef(null);
+  const [minimized, setMinimized] = React.useState(false);
+  const [position, setPosition] = React.useState(() => ({
+    x: Math.max(12, window.innerWidth - 352),
+    y: Math.max(72, window.innerHeight - 320),
+  }));
+
+  React.useEffect(() => {
+    const element = video.current;
+    if (element) element.srcObject = stream;
+    return () => { if (element) element.srcObject = null; };
+  }, [stream]);
+
+  const startDrag = (event) => {
+    if (event.target.closest("button")) return;
+    drag.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: position.x,
+      originY: position.y,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const moveDrag = (event) => {
+    if (!drag.current || drag.current.pointerId !== event.pointerId) return;
+    const bounds = windowRef.current?.getBoundingClientRect();
+    const maxX = Math.max(8, window.innerWidth - (bounds?.width || 320) - 8);
+    const maxY = Math.max(60, window.innerHeight - (bounds?.height || 220) - 8);
+    setPosition({
+      x: Math.min(maxX, Math.max(8, drag.current.originX + event.clientX - drag.current.startX)),
+      y: Math.min(maxY, Math.max(60, drag.current.originY + event.clientY - drag.current.startY)),
+    });
+  };
+  const stopDrag = (event) => {
+    if (drag.current?.pointerId === event.pointerId) drag.current = null;
+  };
+
+  return <aside ref={windowRef} className={`atto-camera-preview${minimized ? " minimized" : ""}`} style={{ left: position.x, top: position.y }} aria-label="Câmera ativa">
+    <header onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} onDoubleClick={() => setMinimized(!minimized)}>
+      <span><i /> Câmera ativa</span>
+      <div className="camera-window-actions">
+        <button type="button" onClick={() => setMinimized(!minimized)} aria-label={minimized ? "Restaurar câmera" : "Minimizar câmera"} title={minimized ? "Restaurar" : "Minimizar"}>{minimized ? "□" : "−"}</button>
+        <button type="button" className="camera-close" onClick={onClose} aria-label="Fechar câmera" title="Fechar câmera">×</button>
+      </div>
+    </header>
+    {!minimized && <><video ref={video} autoPlay muted playsInline /><small>Arraste para mover · redimensione pelo canto</small></>}
+  </aside>;
+};
+
 const App = () => {
   const [cameraStream, setCameraStream] = React.useState(null);
-  const cameraPreview = React.useRef(null);
 
   React.useEffect(() => {
     const updateCamera = ({ detail }) => setCameraStream(detail?.stream || null);
     window.addEventListener("atto:camera-state", updateCamera);
     return () => window.removeEventListener("atto:camera-state", updateCamera);
   }, []);
-
-  React.useEffect(() => {
-    if (cameraPreview.current) cameraPreview.current.srcObject = cameraStream;
-  }, [cameraStream]);
 
   React.useEffect(() => {
     let node;
@@ -46,11 +94,7 @@ const App = () => {
   return <>
     <DesktopTitlebar />
     <Routes />
-    {cameraStream && <aside className="atto-camera-preview" aria-label="Câmera ativa">
-      <header><span><i /> Câmera ativa</span><button type="button" onClick={stopBrowserCamera} aria-label="Fechar câmera" title="Fechar câmera">×</button></header>
-      <video ref={cameraPreview} autoPlay muted playsInline />
-      <small>Continue conversando com o Atto normalmente.</small>
-    </aside>}
+    {cameraStream && <CameraPreview stream={cameraStream} onClose={stopBrowserCamera} />}
   </>;
 };
 

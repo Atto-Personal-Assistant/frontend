@@ -58,48 +58,38 @@ export const Use = () => {
   const [shareDevices, setShareDevices] = React.useState([]);
   const [shareError, setShareError] = React.useState("");
   const [shareFile, setShareFile] = React.useState(null);
+  const [connectedDevices, setConnectedDevices] = React.useState([]);
   const {
-    input, setAttachment, messages, status, isRunning, pendingQuestion,
-    isListening, handleInput, sendRequest, resendMessage, answerQuestion, startListening,
+    input, attachment, setAttachment, messages, status, isRunning, pendingQuestion,
+    isListening, listeningMode, voiceTranscript, voiceSupported, handsFree, toggleHandsFree, queuedVoiceCommand, queuedVoiceCount,
+    handleInput, sendRequest, resendMessage, answerQuestion, startListening,
     voiceEnabled, setVoiceEnabled, isSpeaking, stopSpeech,
     copiedMessageId, copyMessage, speakMessage, rerunAction, availableActions,
     chats, activeChatId, createNewChat, selectChat, deleteChat,
   } = useUse();
   React.useEffect(() => {
-    const deviceId = window.localStorage.getItem("atto.active-device");
-    const deviceToken = window.localStorage.getItem("atto.device-token");
-    if (!deviceId || !deviceToken) return undefined;
-    const base = new URL(Config.STAGE.BASE_URL);
-    const socketUrl = `${base.protocol === "https:" ? "wss:" : "ws:"}//${base.host}/devices/${encodeURIComponent(deviceId)}/events?token=${encodeURIComponent(deviceToken)}`;
-    let socket;
-    let reconnectTimer;
-    let stopped = false;
-
-    const connect = () => {
-      if (stopped) return;
-      try {
-        socket = new WebSocket(socketUrl);
-        socket.onmessage = (event) => {
-          try {
-            const command = JSON.parse(event.data);
-            if (["share_content", "view_content", "view_media"].includes(command.action)) setSharedContent({ ...(command.payload || {}), sender: command.sender, media: command.action === "view_media" });
-          } catch { /* Ignore malformed device events. */ }
-        };
-        socket.onclose = () => {
-          if (!stopped) reconnectTimer = window.setTimeout(connect, 3000);
-        };
-        socket.onerror = () => socket.close();
-      } catch {
-        reconnectTimer = window.setTimeout(connect, 3000);
+    let active = true;
+    const refreshDevices = () => listDevices()
+      .then(({ devices = [] }) => { if (active) setConnectedDevices(devices.filter(({ online }) => online)); })
+      .catch(() => {});
+    refreshDevices();
+    const timer = window.setInterval(refreshDevices, 15000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, []);
+  React.useEffect(() => {
+    const focusComposer = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        document.querySelector(".chat-request-input")?.focus();
       }
     };
-
-    connect();
-    return () => {
-      stopped = true;
-      window.clearTimeout(reconnectTimer);
-      socket?.close();
-    };
+    window.addEventListener("keydown", focusComposer);
+    return () => window.removeEventListener("keydown", focusComposer);
+  }, []);
+  React.useEffect(() => {
+    const receiveSharedContent = ({ detail }) => setSharedContent(detail);
+    window.addEventListener("atto:shared-content", receiveSharedContent);
+    return () => window.removeEventListener("atto:shared-content", receiveSharedContent);
   }, []);
   const openShare = async (content) => {
     setShareError("");
@@ -130,7 +120,13 @@ export const Use = () => {
     else sendRequest();
   };
 
-  const updateScrollAffordance = () => {
+  const quickPrompts = [
+    "O que você consegue fazer neste dispositivo?",
+    "Veja o que está na minha câmera",
+    "Continue a última tarefa",
+  ];
+
+  const updateScrollAffordance = React.useCallback(() => {
     const element = chatHistoryRef.current;
     if (!element) return;
     const lastMessage = messages[messages.length - 1];
@@ -141,7 +137,7 @@ export const Use = () => {
     }
     const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
     setShowLatestButton(distanceFromBottom > 120);
-  };
+  }, [messages]);
 
   const scrollToLatest = () => {
     const element = chatHistoryRef.current;
@@ -156,7 +152,7 @@ export const Use = () => {
     element.addEventListener("scroll", updateScrollAffordance, { passive: true });
     updateScrollAffordance();
     return () => element.removeEventListener("scroll", updateScrollAffordance);
-  }, [activeChatId]);
+  }, [activeChatId, updateScrollAffordance]);
 
   React.useEffect(() => {
     const element = chatHistoryRef.current;
@@ -176,8 +172,11 @@ export const Use = () => {
         {sharedContent && <div className="shared-content-backdrop"><section className="shared-content-banner" role="dialog" aria-modal="true"><button type="button" onClick={() => setSharedContent(null)}>×</button><span>Compartilhado por {sharedContent.sender?.name || "um dispositivo"}</span><h2>{sharedContent.title || "Atto"}</h2>{sharedContent.media ? <>{sharedContent.media_type?.startsWith("image/") && <img className="shared-media" src={`${Config.STAGE.BASE_URL}${sharedContent.url}`} alt={sharedContent.title} />}{sharedContent.media_type?.startsWith("video/") && <video className="shared-media" src={`${Config.STAGE.BASE_URL}${sharedContent.url}`} controls />}{sharedContent.media_type?.startsWith("audio/") && <audio src={`${Config.STAGE.BASE_URL}${sharedContent.url}`} controls />}</> : <p>{sharedContent.content}</p>}</section></div>}
         {shareTarget && <div className="share-modal-backdrop" role="presentation"><section className="share-modal" role="dialog" aria-modal="true"><button className="share-modal-close" type="button" onClick={() => { setShareTarget(null); setShareFile(null); }}>×</button><span className="eyebrow">COMPARTILHAR</span><h2>Enviar para qual dispositivo?</h2><input type="file" accept="image/*,video/*,audio/*" onChange={(event) => setShareFile(event.target.files?.[0] || null)} />{shareFile && <p className="share-file-name">{shareFile.name}</p>}{shareError && <p className="share-error">{shareError}</p>}<div className="share-device-list">{shareDevices.map((device) => <button type="button" key={device.id} onClick={() => shareTo(device)}><span className="share-device-avatar">{device.name.slice(0, 1).toUpperCase()}</span><span><strong>{device.name}</strong><small>{device.online ? "Online" : "Online quando conectar"}</small></span></button>)}</div></section></div>}
         <header className="agent-hero">
-          <div className="agent-brand"><span className="agent-orb">A</span><div><span className="eyebrow">ATTO AGENT</span><h1>Central de execução</h1></div></div>
-          <div className={`agent-presence${isRunning ? " is-running" : ""}`}><span />{isRunning ? "Trabalhando" : "Pronto para ajudar"}</div>
+          <div className="agent-brand"><span className="agent-orb">A</span><div><span className="eyebrow">ATTO</span><h1>Seu espaço, em qualquer dispositivo</h1></div></div>
+          <div className="agent-context">
+            <span className="device-presence" title={connectedDevices.map(({ name }) => name).join(", ")}><i />{connectedDevices.length} {connectedDevices.length === 1 ? "dispositivo" : "dispositivos"}</span>
+            <div className={`agent-presence${isRunning ? " is-running" : ""}`}><span />{isRunning ? "Executando" : "Disponível"}</div>
+          </div>
         </header>
 
         <section className={`agent-grid${historyVisible ? "" : " history-hidden"}`}>
@@ -196,6 +195,12 @@ export const Use = () => {
           <section className="conversation-panel" aria-label="Conversa com o Atto">
             <div className="panel-heading"><div className="conversation-heading"><button type="button" className="history-toggle" onClick={() => setHistoryVisible(!historyVisible)} aria-expanded={historyVisible} aria-controls="conversation-history" title={historyVisible ? "Ocultar histórico" : "Mostrar histórico"}>☰</button><div><span className="eyebrow">CONVERSA</span><h2>Seu pedido, do início ao resultado</h2></div></div><div className="conversation-actions">{availableActions.map((action) => { const isJob = action.operation === "get_development_job"; const label = isJob ? "Consultar job" : "Reexecutar ação"; return <button key={action.name} type="button" className="rerun-action" onClick={() => rerunAction(action)} disabled={isRunning} title={`${label}: ${action.name}`} aria-label={`${label}: ${action.name}`}>{isJob ? "◌" : "↻"}</button>; })}<button className={`voice-toggle${voiceEnabled ? " enabled" : ""}`} type="button" onClick={() => setVoiceEnabled(!voiceEnabled)} aria-pressed={voiceEnabled} title={voiceEnabled ? "Desligar voz" : "Ligar voz"} aria-label={voiceEnabled ? "Desligar voz" : "Ligar voz"}>⌁</button></div></div>
             <div ref={chatHistoryRef} className="chat-history" aria-live="polite">
+              {messages.length <= 1 && <section className="conversation-welcome">
+                <span className="welcome-orb">A</span>
+                <h3>Como posso mover seu dia agora?</h3>
+                <p>Escreva, anexe algo ou diga <strong>“Atto”</strong> seguido do pedido.</p>
+                <div className="quick-prompts">{quickPrompts.map((prompt) => <button type="button" key={prompt} onClick={() => sendRequest(prompt)}>{prompt}<span>↗</span></button>)}</div>
+              </section>}
               {messages.map(({ actor, message, media, action, actions = [] }, currentIndex) => {
                 const messageId = `${actor}-${currentIndex}`;
                 return (
@@ -220,17 +225,20 @@ export const Use = () => {
                 </article>
                 );
               })}
-              {status && <div className="chat-status"><span />{status}</div>}
+              {(status || queuedVoiceCommand) && <div className="chat-status"><span />{queuedVoiceCommand ? `${queuedVoiceCount} pedido${queuedVoiceCount > 1 ? "s" : ""} de voz na fila · ${queuedVoiceCommand}` : status}</div>}
               {pendingQuestion?.options?.length > 0 && <div className="chat-options">{pendingQuestion.options.map((option) => <button key={option} onClick={() => answerQuestion(option)}>{option}</button>)}</div>}
               {showLatestButton && <button type="button" className="scroll-latest" onClick={scrollToLatest} aria-label="Ir para a mensagem mais recente" title="Ir para a mensagem mais recente">↓ Mensagem mais recente</button>}
             </div>
-            <form className="chat-request" onSubmit={submit}>
-              <input value={input} onChange={handleInput} className="chat-request-input" placeholder={pendingQuestion ? "Digite sua decisão..." : "Descreva o que você quer fazer..."} disabled={isRunning && !pendingQuestion} />
-              <label className="chat-attach" title="Anexar mídia">＋<input type="file" accept="image/*,video/*,audio/*" onChange={(event) => setAttachment(event.target.files?.[0] || null)} /></label>
-              <button type="button" className={`chat-request-audio${isListening ? " is-listening" : ""}`} onClick={startListening} disabled={isRunning && !pendingQuestion} aria-label={isListening ? "Parar ditado por voz" : "Ditar por voz"} title={isListening ? "Ouvindo..." : "Ditar por voz"}>🎙</button>
-              <button className="chat-request-send" disabled={isRunning && !pendingQuestion} aria-label="Enviar mensagem">{pendingQuestion ? "✓" : "↑"}</button>
-            </form>
-            <p className="input-hint">Use o microfone para ditar sua mensagem. O Atto responde por texto e voz.</p>
+            <div className={`composer-shell${isListening ? " is-listening" : ""}`}>
+              {(attachment || voiceTranscript) && <div className="composer-context">{attachment && <span>📎 {attachment.name}<button type="button" onClick={() => setAttachment(null)} aria-label="Remover anexo">×</button></span>}{voiceTranscript && <span className="live-transcript"><i />{voiceTranscript}</span>}</div>}
+              <form className="chat-request" onSubmit={submit}>
+                <label className="chat-attach" title="Anexar imagem, vídeo ou áudio">＋<input type="file" accept="image/*,video/*,audio/*" onChange={(event) => setAttachment(event.target.files?.[0] || null)} /></label>
+                <textarea rows="1" value={input} onChange={handleInput} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); submit(event); } }} className="chat-request-input" placeholder={pendingQuestion ? "Responda para o Atto..." : isRunning ? "Escreva o próximo pedido enquanto o Atto trabalha..." : "Peça qualquer coisa..."} />
+                <button type="button" className={`chat-request-audio${listeningMode === "dictation" ? " is-listening" : ""}`} onClick={() => startListening("dictation")} disabled={!voiceSupported} aria-label={isListening ? "Parar microfone" : "Falar e enviar"} title="Falar e enviar automaticamente">●</button>
+                <button className="chat-request-send" disabled={isRunning && !pendingQuestion} aria-label="Enviar mensagem">{pendingQuestion ? "✓" : "↑"}</button>
+              </form>
+              <div className="composer-footer"><button type="button" className={`hands-free-toggle${handsFree ? " enabled" : ""}`} onClick={toggleHandsFree} disabled={!voiceSupported} aria-pressed={handsFree}><span className="hands-free-dot" />{handsFree ? "Mãos livres ouvindo “Atto”" : "Ativar mãos livres"}</button><span>Enter envia · Shift + Enter quebra linha</span></div>
+            </div>
           </section>
         </section>
       </main>

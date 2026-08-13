@@ -62,11 +62,14 @@ h6 {
 
 .atto-camera-preview {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
   z-index: 1000;
-  width: min(320px, calc(100vw - 40px));
+  width: 320px;
+  min-width: 240px;
+  min-height: 190px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 68px);
   overflow: hidden;
+  resize: both;
   color: #eef6ff;
   background: rgba(8, 16, 30, .9);
   border: 1px solid rgba(127, 190, 255, .3);
@@ -82,10 +85,22 @@ h6 {
   padding: 9px 12px;
   font-size: 12px;
   font-weight: 700;
+  cursor: move;
+  touch-action: none;
+  user-select: none;
 }
 
 .atto-camera-preview header span { display: flex; align-items: center; gap: 7px; }
 .atto-camera-preview header i { width: 8px; height: 8px; border-radius: 50%; background: #ff5263; box-shadow: 0 0 10px #ff5263; }
-.atto-camera-preview button { border: 0; color: inherit; background: transparent; cursor: pointer; font-size: 20px; }
-.atto-camera-preview video { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #000; transform: scaleX(-1); }
+.camera-window-actions { display: flex; align-items: center; gap: 3px; }
+.atto-camera-preview button { display: grid; width: 28px; height: 26px; place-items: center; border: 0; border-radius: 7px; color: #b9c9dc; background: transparent; cursor: pointer; font-size: 18px; }
+.atto-camera-preview button:hover { color: #fff; background: rgba(255, 255, 255, .1); }
+.atto-camera-preview .camera-close:hover { background: #b94053; }
+.atto-camera-preview video { display: block; width: 100%; height: calc(100% - 68px); min-height: 140px; object-fit: cover; background: #000; transform: scaleX(-1); }
 .atto-camera-preview small { display: block; padding: 9px 12px; color: #9fb0c8; }
+.atto-camera-preview.minimized { width: 220px; min-width: 220px; min-height: 0; resize: none; }
+.atto-camera-preview.minimized header { cursor: move; }
+
+@media (max-width: 600px) {
+  .atto-camera-preview { width: min(300px, calc(100vw - 16px)); min-width: 210px; }
+}
