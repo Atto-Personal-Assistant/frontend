@@ -29,6 +29,9 @@ export const Devices = () => {
     try {
       const result = await registerDevice({ name: newName.trim() });
       setDevices((current) => [...current, result.device]);
+      if (result.device_token) {
+        localStorage.setItem(`atto.device-token:${result.device.id}`, result.device_token);
+      }
       setNewName("");
       setAdding(false);
     } catch (reason) { setError(reason.message); }
@@ -38,6 +41,8 @@ export const Devices = () => {
     try {
       await activateDevice(device.id);
       localStorage.setItem("atto.active-device", device.id);
+      const token = localStorage.getItem(`atto.device-token:${device.id}`);
+      if (token) localStorage.setItem("atto.device-token", token);
       navigate("/use");
     } catch (reason) { setError(reason.message); }
   };

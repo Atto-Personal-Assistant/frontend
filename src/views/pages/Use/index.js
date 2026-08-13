@@ -51,6 +51,8 @@ const MarkdownMessage = ({ message }) => {
 };
 
 export const Use = () => {
+  const chatHistoryRef = React.useRef(null);
+  const [showLatestButton, setShowLatestButton] = React.useState(false);
   const [sharedContent, setSharedContent] = React.useState(null);
   const [shareTarget, setShareTarget] = React.useState(null);
   const [shareDevices, setShareDevices] = React.useState([]);
@@ -65,9 +67,10 @@ export const Use = () => {
   } = useUse();
   React.useEffect(() => {
     const deviceId = window.localStorage.getItem("atto.active-device");
-    if (!deviceId) return undefined;
+    const deviceToken = window.localStorage.getItem("atto.device-token");
+    if (!deviceId || !deviceToken) return undefined;
     const base = new URL(Config.STAGE.BASE_URL);
-    const socketUrl = `${base.protocol === "https:" ? "wss:" : "ws:"}//${base.host}/devices/${encodeURIComponent(deviceId)}/events`;
+    const socketUrl = `${base.protocol === "https:" ? "wss:" : "ws:"}//${base.host}/devices/${encodeURIComponent(deviceId)}/events?token=${encodeURIComponent(deviceToken)}`;
     let socket;
     let reconnectTimer;
     let stopped = false;
@@ -127,6 +130,40 @@ export const Use = () => {
     else sendRequest();
   };
 
+  const updateScrollAffordance = () => {
+    const element = chatHistoryRef.current;
+    if (!element) return;
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    setShowLatestButton(distanceFromBottom > 120);
+  };
+
+  const scrollToLatest = () => {
+    const element = chatHistoryRef.current;
+    if (!element) return;
+    element.scrollTo({ top: element.scrollHeight, behavior: "smooth" });
+    setShowLatestButton(false);
+  };
+
+  React.useEffect(() => {
+    const element = chatHistoryRef.current;
+    if (!element) return undefined;
+    element.addEventListener("scroll", updateScrollAffordance, { passive: true });
+    updateScrollAffordance();
+    return () => element.removeEventListener("scroll", updateScrollAffordance);
+  }, [activeChatId]);
+
+  React.useEffect(() => {
+    const element = chatHistoryRef.current;
+    if (!element) return;
+    const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+    if (distanceFromBottom < 180) {
+      element.scrollTo({ top: element.scrollHeight, behavior: "smooth" });
+      setShowLatestButton(false);
+    } else {
+      setShowLatestButton(true);
+    }
+  }, [messages.length, status]);
+
   return (
     <Layout>
       <main className="agent-workspace">
@@ -152,7 +189,7 @@ export const Use = () => {
           </aside>
           <section className="conversation-panel" aria-label="Conversa com o Atto">
             <div className="panel-heading"><div className="conversation-heading"><button type="button" className="history-toggle" onClick={() => setHistoryVisible(!historyVisible)} aria-expanded={historyVisible} aria-controls="conversation-history" title={historyVisible ? "Ocultar histórico" : "Mostrar histórico"}>☰</button><div><span className="eyebrow">CONVERSA</span><h2>Seu pedido, do início ao resultado</h2></div></div><div className="conversation-actions">{availableActions.map((action) => <button key={action.name} type="button" className="rerun-action" onClick={() => rerunAction(action)} disabled={isRunning} title={`Executar ${action.name} novamente`}>↻ {action.name}</button>)}<button className={`voice-toggle${voiceEnabled ? " enabled" : ""}`} type="button" onClick={() => setVoiceEnabled(!voiceEnabled)} aria-pressed={voiceEnabled}>⌁ Voz {voiceEnabled ? "ligada" : "desligada"}</button></div></div>
-            <div className="chat-history" aria-live="polite">
+            <div ref={chatHistoryRef} className="chat-history" aria-live="polite">
               {messages.map(({ actor, message, media, action, actions = [] }, currentIndex) => {
                 const messageId = `${actor}-${currentIndex}`;
                 return (
@@ -177,6 +214,7 @@ export const Use = () => {
               })}
               {status && <div className="chat-status"><span />{status}</div>}
               {pendingQuestion?.options?.length > 0 && <div className="chat-options">{pendingQuestion.options.map((option) => <button key={option} onClick={() => answerQuestion(option)}>{option}</button>)}</div>}
+              {showLatestButton && <button type="button" className="scroll-latest" onClick={scrollToLatest} aria-label="Ir para a mensagem mais recente" title="Ir para a mensagem mais recente">↓ Mensagem mais recente</button>}
             </div>
             <form className="chat-request" onSubmit={submit}>
               <input value={input} onChange={handleInput} className="chat-request-input" placeholder={pendingQuestion ? "Digite sua decisão..." : "Descreva o que você quer fazer..."} disabled={isRunning && !pendingQuestion} />

@@ -1,5 +1,7 @@
 import { Config } from "application/constants";
 
+export { AttoNode, browserMusicHandler } from "../../devices/attoNode";
+
 const headers = () => ({
   "Content-Type": "application/json",
   ...(process.env.REACT_APP_INTERNAL_TOKEN

@@ -261,6 +261,7 @@
   cursor: not-allowed;
 }
 .chat-history {
+  position: relative;
   flex: 1;
   overflow: auto;
   padding: 25px;
@@ -268,6 +269,23 @@
   flex-direction: column;
   gap: 14px;
 }
+.scroll-latest {
+  position: sticky;
+  bottom: 16px;
+  display: block;
+  margin: 12px auto 0;
+  padding: 9px 14px;
+  border: 1px solid #5b8fc5;
+  border-radius: 999px;
+  color: #eaf6ff;
+  background: #173a60e8;
+  box-shadow: 0 8px 24px #02050d66;
+  cursor: pointer;
+  font-size: .76rem;
+  font-weight: 700;
+  z-index: 2;
+}
+.scroll-latest:hover { background: #245783; border-color: #8acbff; }
 .message {
   max-width: 82%;
   padding: 13px 15px;
