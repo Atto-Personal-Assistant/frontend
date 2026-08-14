@@ -128,14 +128,16 @@ const waitForDeviceCommand = async (commandId, { signal, timeoutMs = 15000 } = {
   throw new Error("A câmera demorou demais para responder.");
 };
 
-const configuredIceServers = () => {
-  try {
-    const configured = JSON.parse(process.env.REACT_APP_WEBRTC_ICE_SERVERS || "null");
-    if (Array.isArray(configured) && configured.length) return configured;
-  } catch (_) {
-    // Use public STUN when no custom STUN/TURN list was supplied.
-  }
-  return [{ urls: "stun:stun.l.google.com:19302" }];
+const fetchIceServers = async ({ signal } = {}) => {
+  const identity = readLocalNodeIdentity();
+  if (!identity.id || !identity.token) throw new Error("O dispositivo local ainda não está autenticado.");
+  const response = await fetch(
+    `${Config.STAGE.BASE_URL}/devices/${encodeURIComponent(identity.id)}/webrtc/ice-servers?token=${encodeURIComponent(identity.token)}`,
+    { headers: headers(), signal },
+  );
+  if (!response.ok) throw new Error("Não foi possível obter a configuração segura do WebRTC.");
+  const result = await response.json();
+  return Array.isArray(result.ice_servers) ? result.ice_servers : [];
 };
 
 const gatherIce = (peer, timeoutMs = 5000) => new Promise((resolve) => {
@@ -147,7 +149,8 @@ const gatherIce = (peer, timeoutMs = 5000) => new Promise((resolve) => {
 });
 
 export const openRemoteCameraStream = async (deviceId, { signal, onStream } = {}) => {
-  const peer = new RTCPeerConnection({ iceServers: configuredIceServers() });
+  const iceServers = await fetchIceServers({ signal });
+  const peer = new RTCPeerConnection({ iceServers });
   const stream = new MediaStream();
   peer.addTransceiver("video", { direction: "recvonly" });
   peer.ontrack = ({ track, streams }) => {
@@ -163,6 +166,7 @@ export const openRemoteCameraStream = async (deviceId, { signal, onStream } = {}
     if (signal?.aborted) throw new DOMException("Transmissão cancelada.", "AbortError");
     const command = await sendDeviceCommand(deviceId, "camera.stream.offer", {
       offer: peer.localDescription.toJSON(),
+      ice_servers: iceServers,
       consent_required: true,
     });
     if (!command.command_id) throw new Error("A transmissão não retornou um identificador.");

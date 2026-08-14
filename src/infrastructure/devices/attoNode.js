@@ -163,16 +163,6 @@ let activeCameraStream = null;
 let activeCameraVideo = null;
 let activeCameraPeer = null;
 
-const iceServers = () => {
-  try {
-    const configured = JSON.parse(process.env.REACT_APP_WEBRTC_ICE_SERVERS || "null");
-    if (Array.isArray(configured) && configured.length) return configured;
-  } catch (_) {
-    // Fall back to public STUN below when configuration is malformed.
-  }
-  return [{ urls: "stun:stun.l.google.com:19302" }];
-};
-
 const waitForIceGathering = (peer, timeoutMs = 5000) => new Promise((resolve) => {
   if (peer.iceGatheringState === "complete") return resolve();
   const timeout = window.setTimeout(done, timeoutMs);
@@ -201,13 +191,13 @@ export const stopBrowserCamera = () => {
   publishCameraState(null);
 };
 
-export const browserCameraStreamOfferHandler = async ({ offer, consent_required: consentRequired } = {}) => {
+export const browserCameraStreamOfferHandler = async ({ offer, ice_servers: iceServers, consent_required: consentRequired } = {}) => {
   if (consentRequired !== true || !offer?.sdp || offer.type !== "offer") {
     throw new Error("A transmissão da câmera exige uma oferta WebRTC autorizada.");
   }
   const camera = await openBrowserCamera({ showPreview: false });
   activeCameraPeer?.close();
-  const peer = new RTCPeerConnection({ iceServers: iceServers() });
+  const peer = new RTCPeerConnection({ iceServers: Array.isArray(iceServers) ? iceServers : [] });
   activeCameraPeer = peer;
   camera.stream.getTracks().forEach((track) => peer.addTrack(track, camera.stream));
   peer.onconnectionstatechange = () => {
