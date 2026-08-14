@@ -1,6 +1,6 @@
 import React from "react";
 import Routes from "routes";
-import { sendDeviceCommand, startLocalAttoNode, stopBrowserCamera } from "infrastructure/services/devices";
+import { openRemoteCameraStream, sendDeviceCommand, startLocalAttoNode, stopBrowserCamera } from "infrastructure/services/devices";
 
 import { DesktopTitlebar } from "views/components/DesktopTitlebar";
 
@@ -63,6 +63,7 @@ const App = () => {
   const [cameraStream, setCameraStream] = React.useState(null);
   const [remoteCameraFrame, setRemoteCameraFrame] = React.useState(null);
   const [remoteCameraDeviceId, setRemoteCameraDeviceId] = React.useState(null);
+  const [remoteCameraStream, setRemoteCameraStream] = React.useState(null);
 
   React.useEffect(() => {
     const updateCamera = ({ detail }) => setCameraStream(detail?.stream || null);
@@ -77,6 +78,23 @@ const App = () => {
       window.removeEventListener("atto:remote-camera-frame", updateRemoteCamera);
     };
   }, []);
+
+  React.useEffect(() => {
+    if (!remoteCameraDeviceId) return undefined;
+    const controller = new AbortController();
+    let peer;
+    openRemoteCameraStream(remoteCameraDeviceId, {
+      signal: controller.signal,
+      onStream: (stream) => { if (!controller.signal.aborted) setRemoteCameraStream(stream); },
+    }).then((connection) => { peer = connection; }).catch((error) => {
+      if (error.name !== "AbortError") console.warn("Não foi possível abrir o vídeo WebRTC:", error);
+    });
+    return () => {
+      controller.abort();
+      peer?.close();
+      setRemoteCameraStream(null);
+    };
+  }, [remoteCameraDeviceId]);
 
   React.useEffect(() => {
     let node;
@@ -104,10 +122,11 @@ const App = () => {
   return <>
     <DesktopTitlebar />
     <Routes />
-    {(cameraStream || remoteCameraFrame) && <CameraPreview stream={cameraStream} dataUrl={remoteCameraFrame} onClose={() => {
+    {(cameraStream || remoteCameraFrame || remoteCameraStream) && <CameraPreview stream={remoteCameraStream || cameraStream} dataUrl={remoteCameraStream ? null : remoteCameraFrame} onClose={() => {
       stopBrowserCamera();
       if (remoteCameraDeviceId) sendDeviceCommand(remoteCameraDeviceId, "camera.stop", {}).catch(() => {});
       setRemoteCameraFrame(null);
+      setRemoteCameraStream(null);
       setRemoteCameraDeviceId(null);
     }} />}
   </>;

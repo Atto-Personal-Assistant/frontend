@@ -161,17 +161,64 @@ export const browserMusicHandler = async ({ uri, url, title }) => {
 
 let activeCameraStream = null;
 let activeCameraVideo = null;
+let activeCameraPeer = null;
+
+const iceServers = () => {
+  try {
+    const configured = JSON.parse(process.env.REACT_APP_WEBRTC_ICE_SERVERS || "null");
+    if (Array.isArray(configured) && configured.length) return configured;
+  } catch (_) {
+    // Fall back to public STUN below when configuration is malformed.
+  }
+  return [{ urls: "stun:stun.l.google.com:19302" }];
+};
+
+const waitForIceGathering = (peer, timeoutMs = 5000) => new Promise((resolve) => {
+  if (peer.iceGatheringState === "complete") return resolve();
+  const timeout = window.setTimeout(done, timeoutMs);
+  function done() {
+    window.clearTimeout(timeout);
+    peer.removeEventListener("icegatheringstatechange", changed);
+    resolve();
+  }
+  function changed() {
+    if (peer.iceGatheringState === "complete") done();
+  }
+  peer.addEventListener("icegatheringstatechange", changed);
+});
 
 const publishCameraState = (stream) => {
   window.dispatchEvent(new CustomEvent("atto:camera-state", { detail: { stream } }));
 };
 
 export const stopBrowserCamera = () => {
+  activeCameraPeer?.close();
+  activeCameraPeer = null;
   activeCameraStream?.getTracks().forEach((track) => track.stop());
   if (activeCameraVideo) activeCameraVideo.srcObject = null;
   activeCameraStream = null;
   activeCameraVideo = null;
   publishCameraState(null);
+};
+
+export const browserCameraStreamOfferHandler = async ({ offer, consent_required: consentRequired } = {}) => {
+  if (consentRequired !== true || !offer?.sdp || offer.type !== "offer") {
+    throw new Error("A transmissão da câmera exige uma oferta WebRTC autorizada.");
+  }
+  const camera = await openBrowserCamera({ showPreview: false });
+  activeCameraPeer?.close();
+  const peer = new RTCPeerConnection({ iceServers: iceServers() });
+  activeCameraPeer = peer;
+  camera.stream.getTracks().forEach((track) => peer.addTrack(track, camera.stream));
+  peer.onconnectionstatechange = () => {
+    if (["failed", "closed"].includes(peer.connectionState) && activeCameraPeer === peer) {
+      stopBrowserCamera();
+    }
+  };
+  await peer.setRemoteDescription(offer);
+  await peer.setLocalDescription(await peer.createAnswer());
+  await waitForIceGathering(peer);
+  return { answer: peer.localDescription.toJSON(), camera_open: true, transport: "webrtc" };
 };
 
 const openBrowserCamera = async ({ showPreview = true } = {}) => {
@@ -243,9 +290,15 @@ export const browserCameraHandler = async ({ camera_id: cameraId = "default" } =
   }
   const settings = track.getSettings();
   const canvas = document.createElement("canvas");
-  canvas.width = settings.width || camera.video.videoWidth;
-  canvas.height = settings.height || camera.video.videoHeight;
+  const sourceWidth = settings.width || camera.video.videoWidth;
+  const sourceHeight = settings.height || camera.video.videoHeight;
+  // Snapshot transport goes through JSON/Base64. Cap the frame dimensions so
+  // capture, encoding, network transfer and browser decoding remain responsive.
+  const scale = Math.min(1, 960 / sourceWidth, 540 / sourceHeight);
+  canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+  canvas.height = Math.max(1, Math.round(sourceHeight * scale));
   canvas.getContext("2d").drawImage(camera.video, 0, 0, canvas.width, canvas.height);
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+  // Repeated remote frames favor latency and bandwidth over archival quality.
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.58);
   return { camera_id: cameraId, media_type: "image/jpeg", data_url: dataUrl, camera_open: true };
 };

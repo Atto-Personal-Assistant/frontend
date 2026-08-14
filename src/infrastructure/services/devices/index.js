@@ -1,6 +1,6 @@
 import { Config } from "application/constants";
 
-import { AttoNode, browserMusicHandler, browserCameraHandler, stopBrowserCamera } from "../../devices/attoNode";
+import { AttoNode, browserMusicHandler, browserCameraHandler, browserCameraStreamOfferHandler, stopBrowserCamera } from "../../devices/attoNode";
 
 export { AttoNode, browserMusicHandler, browserCameraHandler, stopBrowserCamera };
 
@@ -38,6 +38,7 @@ export const startLocalAttoNode = async ({ name = "Este dispositivo", allowRecov
       stopBrowserCamera();
       return { camera_open: false };
     },
+    "camera.stream.offer": browserCameraStreamOfferHandler,
   };
   if (navigator.mediaDevices?.getUserMedia) handlers["camera.capture"] = browserCameraHandler;
   const node = new AttoNode({
@@ -107,6 +108,74 @@ export const sendDeviceCommand = async (deviceId, action, payload) => {
   });
   if (!response.ok) throw new Error("Não foi possível compartilhar o conteúdo.");
   return response.json();
+};
+
+const waitForDeviceCommand = async (commandId, { signal, timeoutMs = 15000 } = {}) => {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (signal?.aborted) throw new DOMException("Captura cancelada.", "AbortError");
+    const response = await fetch(`${Config.STAGE.BASE_URL}/devices/commands/${encodeURIComponent(commandId)}`, {
+      headers: headers(), signal,
+    });
+    if (!response.ok) throw new Error("Não foi possível receber o quadro da câmera.");
+    const result = await response.json();
+    if (result.status === "completed") {
+      if (!result.success) throw new Error(result.error || "A captura da câmera falhou.");
+      return result.result || {};
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 40));
+  }
+  throw new Error("A câmera demorou demais para responder.");
+};
+
+const configuredIceServers = () => {
+  try {
+    const configured = JSON.parse(process.env.REACT_APP_WEBRTC_ICE_SERVERS || "null");
+    if (Array.isArray(configured) && configured.length) return configured;
+  } catch (_) {
+    // Use public STUN when no custom STUN/TURN list was supplied.
+  }
+  return [{ urls: "stun:stun.l.google.com:19302" }];
+};
+
+const gatherIce = (peer, timeoutMs = 5000) => new Promise((resolve) => {
+  if (peer.iceGatheringState === "complete") return resolve();
+  const timeout = window.setTimeout(done, timeoutMs);
+  function done() { window.clearTimeout(timeout); peer.removeEventListener("icegatheringstatechange", changed); resolve(); }
+  function changed() { if (peer.iceGatheringState === "complete") done(); }
+  peer.addEventListener("icegatheringstatechange", changed);
+});
+
+export const openRemoteCameraStream = async (deviceId, { signal, onStream } = {}) => {
+  const peer = new RTCPeerConnection({ iceServers: configuredIceServers() });
+  const stream = new MediaStream();
+  peer.addTransceiver("video", { direction: "recvonly" });
+  peer.ontrack = ({ track, streams }) => {
+    const incoming = streams?.[0];
+    if (incoming) onStream?.(incoming);
+    else { stream.addTrack(track); onStream?.(stream); }
+  };
+  const abort = () => peer.close();
+  signal?.addEventListener("abort", abort, { once: true });
+  try {
+    await peer.setLocalDescription(await peer.createOffer());
+    await gatherIce(peer);
+    if (signal?.aborted) throw new DOMException("Transmissão cancelada.", "AbortError");
+    const command = await sendDeviceCommand(deviceId, "camera.stream.offer", {
+      offer: peer.localDescription.toJSON(),
+      consent_required: true,
+    });
+    if (!command.command_id) throw new Error("A transmissão não retornou um identificador.");
+    const result = await waitForDeviceCommand(command.command_id, { signal });
+    if (!result.answer) throw new Error("O dispositivo não retornou a resposta WebRTC.");
+    await peer.setRemoteDescription(result.answer);
+    return peer;
+  } catch (error) {
+    peer.close();
+    throw error;
+  } finally {
+    signal?.removeEventListener("abort", abort);
+  }
 };
 
 export const uploadDeviceMedia = async (deviceId, file, title = "") => {
