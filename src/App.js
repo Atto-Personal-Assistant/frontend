@@ -1,6 +1,6 @@
 import React from "react";
 import Routes from "routes";
-import { startLocalAttoNode, stopBrowserCamera } from "infrastructure/services/devices";
+import { sendDeviceCommand, startLocalAttoNode, stopBrowserCamera } from "infrastructure/services/devices";
 
 import { DesktopTitlebar } from "views/components/DesktopTitlebar";
 
@@ -62,11 +62,15 @@ const CameraPreview = ({ stream, dataUrl, onClose }) => {
 const App = () => {
   const [cameraStream, setCameraStream] = React.useState(null);
   const [remoteCameraFrame, setRemoteCameraFrame] = React.useState(null);
+  const [remoteCameraDeviceId, setRemoteCameraDeviceId] = React.useState(null);
 
   React.useEffect(() => {
     const updateCamera = ({ detail }) => setCameraStream(detail?.stream || null);
     window.addEventListener("atto:camera-state", updateCamera);
-    const updateRemoteCamera = ({ detail }) => setRemoteCameraFrame(detail?.dataUrl || null);
+    const updateRemoteCamera = ({ detail }) => {
+      setRemoteCameraFrame(detail?.dataUrl || null);
+      setRemoteCameraDeviceId(detail?.deviceId || null);
+    };
     window.addEventListener("atto:remote-camera-frame", updateRemoteCamera);
     return () => {
       window.removeEventListener("atto:camera-state", updateCamera);
@@ -100,7 +104,12 @@ const App = () => {
   return <>
     <DesktopTitlebar />
     <Routes />
-    {(cameraStream || remoteCameraFrame) && <CameraPreview stream={cameraStream} dataUrl={remoteCameraFrame} onClose={() => { stopBrowserCamera(); setRemoteCameraFrame(null); }} />}
+    {(cameraStream || remoteCameraFrame) && <CameraPreview stream={cameraStream} dataUrl={remoteCameraFrame} onClose={() => {
+      stopBrowserCamera();
+      if (remoteCameraDeviceId) sendDeviceCommand(remoteCameraDeviceId, "camera.stop", {}).catch(() => {});
+      setRemoteCameraFrame(null);
+      setRemoteCameraDeviceId(null);
+    }} />}
   </>;
 };
 

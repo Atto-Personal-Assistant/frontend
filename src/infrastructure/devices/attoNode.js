@@ -174,7 +174,7 @@ export const stopBrowserCamera = () => {
   publishCameraState(null);
 };
 
-const openBrowserCamera = async () => {
+const openBrowserCamera = async ({ showPreview = true } = {}) => {
   if (activeCameraStream?.active && activeCameraVideo) return { stream: activeCameraStream, video: activeCameraVideo };
   stopBrowserCamera();
   const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -208,7 +208,7 @@ const openBrowserCamera = async () => {
       if (activeCameraStream === stream) stopBrowserCamera();
     };
   });
-  publishCameraState(stream);
+  if (showPreview) publishCameraState(stream);
   return { stream, video };
 };
 
@@ -220,7 +220,9 @@ export const browserCameraHandler = async ({ camera_id: cameraId = "default" } =
   }
   let camera;
   try {
-    camera = await openBrowserCamera();
+    // A command-triggered capture is viewed by the requesting client. Keep
+    // the source stream alive without opening a second window on this device.
+    camera = await openBrowserCamera({ showPreview: false });
   } catch (error) {
     const permissionError = new Error(
       error.name === "NotAllowedError"
@@ -245,6 +247,5 @@ export const browserCameraHandler = async ({ camera_id: cameraId = "default" } =
   canvas.height = settings.height || camera.video.videoHeight;
   canvas.getContext("2d").drawImage(camera.video, 0, 0, canvas.width, canvas.height);
   const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-  stopBrowserCamera();
-  return { camera_id: cameraId, media_type: "image/jpeg", data_url: dataUrl, camera_open: false };
+  return { camera_id: cameraId, media_type: "image/jpeg", data_url: dataUrl, camera_open: true };
 };

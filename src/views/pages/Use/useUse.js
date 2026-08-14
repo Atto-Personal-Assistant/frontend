@@ -240,7 +240,7 @@ export const useUse = () => {
       setStatus("");
       if (event.camera_frame) {
         window.dispatchEvent(new CustomEvent("atto:remote-camera-frame", {
-          detail: { dataUrl: event.camera_frame },
+          detail: { dataUrl: event.camera_frame, deviceId: event.camera_device_id },
         }));
       }
       addAssistantMessage(event.message, true, event.action, event.actions || []);

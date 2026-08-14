@@ -34,6 +34,10 @@ export const startLocalAttoNode = async ({ name = "Este dispositivo", allowRecov
     "share_content": showSharedContent(false),
     "view_content": showSharedContent(false),
     "view_media": showSharedContent(true),
+    "camera.stop": async () => {
+      stopBrowserCamera();
+      return { camera_open: false };
+    },
   };
   if (navigator.mediaDevices?.getUserMedia) handlers["camera.capture"] = browserCameraHandler;
   const node = new AttoNode({
