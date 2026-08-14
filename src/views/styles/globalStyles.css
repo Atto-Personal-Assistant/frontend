@@ -96,7 +96,8 @@ h6 {
 .atto-camera-preview button { display: grid; width: 28px; height: 26px; place-items: center; border: 0; border-radius: 7px; color: #b9c9dc; background: transparent; cursor: pointer; font-size: 18px; }
 .atto-camera-preview button:hover { color: #fff; background: rgba(255, 255, 255, .1); }
 .atto-camera-preview .camera-close:hover { background: #b94053; }
-.atto-camera-preview video { display: block; width: 100%; height: calc(100% - 68px); min-height: 140px; object-fit: cover; background: #000; transform: scaleX(-1); }
+.atto-camera-preview video, .atto-camera-preview img { display: block; width: 100%; height: calc(100% - 68px); min-height: 140px; object-fit: cover; background: #000; }
+.atto-camera-preview video { transform: scaleX(-1); }
 .atto-camera-preview small { display: block; padding: 9px 12px; color: #9fb0c8; }
 .atto-camera-preview.minimized { width: 220px; min-width: 220px; min-height: 0; resize: none; }
 .atto-camera-preview.minimized header { cursor: move; }

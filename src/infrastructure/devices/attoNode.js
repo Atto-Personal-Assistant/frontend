@@ -244,5 +244,7 @@ export const browserCameraHandler = async ({ camera_id: cameraId = "default" } =
   canvas.width = settings.width || camera.video.videoWidth;
   canvas.height = settings.height || camera.video.videoHeight;
   canvas.getContext("2d").drawImage(camera.video, 0, 0, canvas.width, canvas.height);
-  return { camera_id: cameraId, media_type: "image/jpeg", data_url: canvas.toDataURL("image/jpeg", 0.9), camera_open: true };
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+  stopBrowserCamera();
+  return { camera_id: cameraId, media_type: "image/jpeg", data_url: dataUrl, camera_open: false };
 };

@@ -29,6 +29,8 @@ export const Devices = () => {
     } catch (reason) { setError(reason.message); }
   };
 
+  const keepEditing = (event) => event.stopPropagation();
+
   const addDevice = async () => {
     if (!newName.trim()) return;
     try {
@@ -68,7 +70,7 @@ export const Devices = () => {
         <div className="device-identity"><div className={`device-avatar ${device.online ? "active" : ""}`}>{(device.name || "?").slice(0, 1).toUpperCase()}</div><div><strong>{device.name}</strong><small><span className={`device-status ${device.online ? "online" : "offline"}`} />{device.online ? "Conectado agora" : "Visto anteriormente"}</small></div></div>
         <div className="device-capabilities">{(device.capabilities || []).slice(0, 3).map((capability) => <span key={capability}>{capability.replace("camera.capture", "Câmera").replace("music.play", "Áudio").replace("notification", "Alertas").replace("display", "Tela")}</span>)}</div>
         <code title="Identificador do dispositivo">ID: {device.id}</code>
-        <div className="device-actions">{editing === device.id ? <><input value={name} onChange={(event) => setName(event.target.value)} autoFocus /><button type="button" onClick={() => save(device)}>Salvar</button><button type="button" onClick={() => setEditing(null)}>Cancelar</button></> : <button className="edit-device" type="button" onClick={() => { setEditing(device.id); setName(device.name); }}>Editar nome</button>}</div>
+        <div className="device-actions" onClick={keepEditing} onKeyDown={keepEditing}>{editing === device.id ? <><input value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") save(device); if (event.key === "Escape") setEditing(null); }} autoFocus /><button type="button" onClick={() => save(device)}>Salvar</button><button type="button" onClick={() => setEditing(null)}>Cancelar</button></> : <button className="edit-device" type="button" onClick={() => { setEditing(device.id); setName(device.name); }}>Editar nome</button>}</div>
       </article>)}
       {adding ? <article className="device-card add-device-card"><div className="device-avatar">+</div><input className="new-device-input" value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="Nome do dispositivo" autoFocus /><div className="device-actions"><button type="button" onClick={addDevice}>Cadastrar</button><button type="button" onClick={() => setAdding(false)}>Cancelar</button></div></article> : <button className="add-device-card" type="button" onClick={() => setAdding(true)}><span className="add-device-plus">+</span><strong>Adicionar dispositivo</strong></button>}
     </section>

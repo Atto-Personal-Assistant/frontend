@@ -238,6 +238,11 @@ export const useUse = () => {
 
     if (event.type === "result") {
       setStatus("");
+      if (event.camera_frame) {
+        window.dispatchEvent(new CustomEvent("atto:remote-camera-frame", {
+          detail: { dataUrl: event.camera_frame },
+        }));
+      }
       addAssistantMessage(event.message, true, event.action, event.actions || []);
       if (event.action?.operation === "repeat") {
         setAvailableActions((current) => current.some(({ name }) => name === event.action.name)

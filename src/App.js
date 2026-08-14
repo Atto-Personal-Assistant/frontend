@@ -6,7 +6,7 @@ import { DesktopTitlebar } from "views/components/DesktopTitlebar";
 
 import "views/styles/globalStyles.css";
 
-const CameraPreview = ({ stream, onClose }) => {
+const CameraPreview = ({ stream, dataUrl, onClose }) => {
   const video = React.useRef(null);
   const windowRef = React.useRef(null);
   const drag = React.useRef(null);
@@ -18,7 +18,7 @@ const CameraPreview = ({ stream, onClose }) => {
 
   React.useEffect(() => {
     const element = video.current;
-    if (element) element.srcObject = stream;
+    if (element && stream) element.srcObject = stream;
     return () => { if (element) element.srcObject = null; };
   }, [stream]);
 
@@ -55,17 +55,23 @@ const CameraPreview = ({ stream, onClose }) => {
         <button type="button" className="camera-close" onClick={onClose} aria-label="Fechar câmera" title="Fechar câmera">×</button>
       </div>
     </header>
-    {!minimized && <><video ref={video} autoPlay muted playsInline /><small>Arraste para mover · redimensione pelo canto</small></>}
+    {!minimized && <>{dataUrl ? <img src={dataUrl} alt="Imagem capturada pela câmera remota" /> : <video ref={video} autoPlay muted playsInline />}<small>Arraste para mover · redimensione pelo canto</small></>}
   </aside>;
 };
 
 const App = () => {
   const [cameraStream, setCameraStream] = React.useState(null);
+  const [remoteCameraFrame, setRemoteCameraFrame] = React.useState(null);
 
   React.useEffect(() => {
     const updateCamera = ({ detail }) => setCameraStream(detail?.stream || null);
     window.addEventListener("atto:camera-state", updateCamera);
-    return () => window.removeEventListener("atto:camera-state", updateCamera);
+    const updateRemoteCamera = ({ detail }) => setRemoteCameraFrame(detail?.dataUrl || null);
+    window.addEventListener("atto:remote-camera-frame", updateRemoteCamera);
+    return () => {
+      window.removeEventListener("atto:camera-state", updateCamera);
+      window.removeEventListener("atto:remote-camera-frame", updateRemoteCamera);
+    };
   }, []);
 
   React.useEffect(() => {
@@ -94,7 +100,7 @@ const App = () => {
   return <>
     <DesktopTitlebar />
     <Routes />
-    {cameraStream && <CameraPreview stream={cameraStream} onClose={stopBrowserCamera} />}
+    {(cameraStream || remoteCameraFrame) && <CameraPreview stream={cameraStream} dataUrl={remoteCameraFrame} onClose={() => { stopBrowserCamera(); setRemoteCameraFrame(null); }} />}
   </>;
 };
 
