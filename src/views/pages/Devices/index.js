@@ -62,7 +62,7 @@ export const Devices = () => {
   const offlineCount = devices.length - onlineCount;
 
   return <main className="devices-page">
-    <div className="devices-heading"><div><span className="devices-brand">ATTO CONNECT</span><h1>Um espaço. Todos os seus dispositivos.</h1><p>{onlineCount ? `${onlineCount} conectado${onlineCount > 1 ? "s" : ""} agora` : "Abra o Atto em outro dispositivo para vê-lo aqui"}</p></div><button className="devices-refresh" type="button" onClick={refresh}>↻ Atualizar</button></div>
+    <div className="devices-heading"><div><span className="devices-brand">ATTO CONNECT</span><h1>Um espaço. Todos os seus dispositivos.</h1><p>{onlineCount ? `${onlineCount} conectado${onlineCount > 1 ? "s" : ""} agora` : "Abra o Atto em outro dispositivo para vê-lo aqui"}</p></div><div className="devices-heading-actions"><button className="devices-terminal-btn" type="button" onClick={() => navigate("/terminal")}>Terminal</button><button className="devices-refresh" type="button" onClick={refresh}>↻ Atualizar</button></div></div>
     {error && <p className="devices-error">{error}</p>}
     <section className="devices-list">
       {devices.length === 0 && !error && <p>Nenhum dispositivo registrado.</p>}

@@ -1,4 +1,4 @@
-import { Home, Use, Devices } from "views/pages";
+import { Home, Use, Devices, Terminal } from "views/pages";
 
 export const ROUTES = [
   {
@@ -16,5 +16,9 @@ export const ROUTES = [
   {
     path: "/devices",
     component: Devices,
+  },
+  {
+    path: "/terminal",
+    component: Terminal,
   },
 ];

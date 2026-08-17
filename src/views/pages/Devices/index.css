@@ -1,5 +1,8 @@
 .devices-page { box-sizing: border-box; min-height: 100vh; margin: 0; padding: clamp(42px, 8vh, 90px) 28px; color: #fff; background: radial-gradient(circle at 50% 0%, #173556 0, #101827 42%, #080d18 100%); text-align: center; }
 .devices-heading { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 52px; }
+.devices-heading-actions { display: flex; align-items: center; gap: 10px; margin-top: 20px; }
+.devices-terminal-btn { border: 1px solid #5fa5d1; border-radius: 999px; padding: 9px 18px; cursor: pointer; background: rgba(95, 165, 209, 0.12); color: #7de3ff; font-size: 13px; font-weight: 600; }
+.devices-terminal-btn:hover { background: rgba(95, 165, 209, 0.25); }
 .devices-heading h1 { margin: 18px 0 6px; font-size: clamp(30px, 4.5vw, 48px); font-weight: 650; letter-spacing: -.05em; }
 .devices-heading p { margin: 0; color: #a9a8b8; font-size: 16px; }
 .devices-brand { color: #7de3ff; font-size: 13px; font-weight: 800; letter-spacing: .28em; }

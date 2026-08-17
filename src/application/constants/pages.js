@@ -5,10 +5,14 @@ export const PAGES = [
   },
   {
     path: "/home",
-    label: "Visão geral",
+    label: "Visao geral",
   },
   {
     path: "/use",
     label: "Conversar",
+  },
+  {
+    path: "/terminal",
+    label: "Terminal",
   },
 ];

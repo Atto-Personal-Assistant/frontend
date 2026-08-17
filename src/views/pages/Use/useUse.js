@@ -10,7 +10,7 @@ const handsFreeStorageKey = "atto.voice.hands-free";
 export const voiceCommandFromTranscript = (transcript, mode) => {
   const normalized = String(transcript || "").trim();
   if (mode !== "hands-free") return normalized;
-  return normalized.match(/^\s*(?:atto|ato)[,.:;!\s]+(.+)$/i)?.[1]?.trim() || "";
+  return normalized.match(/^\s*(?:ato|ato)[,.:;!\s]+(.+)$/i)?.[1]?.trim() || "";
 };
 
 const createChat = () => ({
